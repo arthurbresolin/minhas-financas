@@ -110,7 +110,12 @@ async def read_summary(
         expense_work_time=work_time(
             expense_cents or 0, user.hourly_rate_cents, user.workday_hours
         ),
-        balance_work_time=work_time(
-            max(0, balance_cents), user.hourly_rate_cents, user.workday_hours
+        # Só faz sentido falar em "tempo de trabalho guardado" com saldo
+        # positivo — no vermelho, "0 horas guardadas" seria uma frase vazia
+        # ocupando o lugar da informação que importa (o saldo negativo).
+        balance_work_time=(
+            work_time(balance_cents, user.hourly_rate_cents, user.workday_hours)
+            if balance_cents > 0
+            else None
         ),
     )
