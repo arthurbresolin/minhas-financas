@@ -15,7 +15,7 @@ import { Field } from '@/components/ui/field';
 import { Screen } from '@/components/ui/screen';
 import { AppText } from '@/components/ui/text';
 import { centsFromDigits, formatMoney } from '@/lib/format';
-import { FONTS } from '@/theme/tokens';
+import { cardSkin, chipForeground, chipSkin, radiusFor, space } from '@/theme/style';
 import { useTheme } from '@/theme/use-theme';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'];
@@ -99,9 +99,14 @@ export default function NovaTransacaoScreen() {
 
   return (
     <Screen scroll={false}>
-      <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={{ gap: space(theme, 16), paddingBottom: 20 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <AppText variant="title">Novo lançamento</AppText>
+          <AppText variant="condensed" size={22}>
+            NOVO LANÇAMENTO
+          </AppText>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <AppText muted size={20}>
               ✕
@@ -116,17 +121,12 @@ export default function NovaTransacaoScreen() {
               <Pressable
                 key={option}
                 onPress={() => setKind(option)}
-                style={{
-                  flex: 1,
-                  paddingVertical: 10,
-                  borderRadius: 14,
-                  alignItems: 'center',
-                  backgroundColor: active ? theme.accent : theme.surface,
-                  borderWidth: 1,
-                  borderColor: active ? theme.accent : theme.border,
-                }}
+                style={[
+                  chipSkin(theme, active),
+                  { flex: 1, paddingVertical: space(theme, 10), alignItems: 'center' },
+                ]}
               >
-                <AppText color={active ? theme.onAccent : theme.textMuted}>
+                <AppText color={active ? chipForeground(theme, true) : theme.textMuted}>
                   {option === 'expense' ? 'Gasto' : 'Entrada'}
                 </AppText>
               </Pressable>
@@ -134,9 +134,12 @@ export default function NovaTransacaoScreen() {
           })}
         </View>
 
-        <View style={{ alignItems: 'center', paddingVertical: 6 }}>
+        <View style={{ alignItems: 'center', paddingVertical: space(theme, 6) }}>
+          {/* Mesmo tipo do saldo na Home: valor grande é sempre Anton. Nos temas
+              de voz grossa ele cresce — o número virar cartaz é parte da pele. */}
           <AppText
-            style={{ fontFamily: FONTS.mono, fontSize: 40, lineHeight: 54 }}
+            variant="numeric"
+            size={theme.style === 'futuristic' || theme.style === 'bold' ? 52 : 40}
             color={amountCents ? theme.text : theme.textMuted}
           >
             {formatMoney(amountCents)}
@@ -148,15 +151,15 @@ export default function NovaTransacaoScreen() {
             <Pressable
               key={key}
               onPress={() => press(key)}
-              style={{
-                width: '31.5%',
-                paddingVertical: 14,
-                borderRadius: 14,
-                alignItems: 'center',
-                backgroundColor: theme.surface,
-                borderWidth: 1,
-                borderColor: theme.border,
-              }}
+              style={[
+                cardSkin(theme),
+                {
+                  width: '31.5%',
+                  paddingVertical: space(theme, 14),
+                  borderRadius: radiusFor(theme, 14),
+                  alignItems: 'center',
+                },
+              ]}
             >
               <AppText variant="mono" size={19}>
                 {key}
@@ -176,16 +179,12 @@ export default function NovaTransacaoScreen() {
                 <Pressable
                   key={category.id}
                   onPress={() => setCategoryId(active ? null : category.id)}
-                  style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 9,
-                    borderRadius: 14,
-                    backgroundColor: active ? theme.accent : theme.surface,
-                    borderWidth: 1,
-                    borderColor: active ? theme.accent : theme.border,
-                  }}
+                  style={[
+                    chipSkin(theme, active),
+                    { paddingHorizontal: 12, paddingVertical: space(theme, 9) },
+                  ]}
                 >
-                  <AppText size={13} color={active ? theme.onAccent : theme.text}>
+                  <AppText size={13} color={chipForeground(theme, active)}>
                     {category.emoji ? `${category.emoji} ` : ''}
                     {category.name}
                   </AppText>
@@ -207,16 +206,12 @@ export default function NovaTransacaoScreen() {
                   <Pressable
                     key={account.id}
                     onPress={() => setAccountId(account.id)}
-                    style={{
-                      paddingHorizontal: 12,
-                      paddingVertical: 9,
-                      borderRadius: 14,
-                      backgroundColor: active ? theme.accent : theme.surface,
-                      borderWidth: 1,
-                      borderColor: active ? theme.accent : theme.border,
-                    }}
+                    style={[
+                      chipSkin(theme, active),
+                      { paddingHorizontal: 12, paddingVertical: space(theme, 9) },
+                    ]}
                   >
-                    <AppText size={13} color={active ? theme.onAccent : theme.text}>
+                    <AppText size={13} color={chipForeground(theme, active)}>
                       {account.icon ? `${account.icon} ` : ''}
                       {account.name}
                     </AppText>

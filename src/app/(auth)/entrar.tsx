@@ -32,9 +32,14 @@ export default function EntrarScreen() {
 
   return (
     <Screen>
-      <View style={{ gap: 6, marginTop: 40, marginBottom: 12 }}>
-        <AppText variant="display" color={theme.accent}>
-          Minhas Finanças
+      <View style={{ gap: 4, marginTop: 40, marginBottom: 12 }}>
+        <AppText variant="mono" size={11} muted>
+          dinheiro é tempo
+        </AppText>
+        {/* A marca é a mesma da barra de status do design: condensada, itálica
+            e com o ponto final — "minhas." */}
+        <AppText variant="condensed" size={44}>
+          MINHAS.
         </AppText>
         <AppText muted>Entre pra ver seu dinheiro.</AppText>
       </View>

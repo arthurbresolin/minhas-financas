@@ -11,10 +11,12 @@ import {
   type Category,
   type Transaction,
 } from '@/api';
+import { Titulo } from '@/components/ng/titulo';
 import { Card } from '@/components/ui/card';
 import { Screen } from '@/components/ui/screen';
 import { AppText } from '@/components/ui/text';
 import { formatDayLabel, formatMoney, formatTime } from '@/lib/format';
+import { radiusFor } from '@/theme/style';
 import { useTheme } from '@/theme/use-theme';
 
 const KIND_SIGN: Record<Transaction['kind'], number> = {
@@ -26,6 +28,9 @@ const KIND_SIGN: Record<Transaction['kind'], number> = {
 
 export default function TransacoesScreen() {
   const theme = useTheme();
+  // Nos temas desenhados a traço a bolinha da categoria é vazada; nos de
+  // superfície ela é preenchida.
+  const vazada = theme.cardStyle === 'outline' || theme.cardStyle === 'line';
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -95,7 +100,7 @@ export default function TransacoesScreen() {
         />
       }
     >
-      <AppText variant="display">Extrato</AppText>
+      <Titulo chapeu="tudo que passou" titulo="extrato" />
 
       {groups.length === 0 ? (
         <Card>
@@ -105,7 +110,7 @@ export default function TransacoesScreen() {
 
       {groups.map(([day, items]) => (
         <View key={day} style={{ gap: 8 }}>
-          <AppText variant="label" muted style={{ textTransform: 'uppercase' }}>
+          <AppText variant="mono" muted size={11} style={{ textTransform: 'uppercase' }}>
             {formatDayLabel(items[0].occurred_at)}
           </AppText>
           <Card padded={false} style={{ overflow: 'hidden' }}>
@@ -130,14 +135,20 @@ export default function TransacoesScreen() {
                     borderTopColor: theme.border,
                   }}
                 >
+                  {/* A bolinha da categoria acompanha o desenho do tema: cheia
+                      nos temas de superfície, vazada nos de traço. O emoji
+                      continua sendo o da categoria que a pessoa escolheu —
+                      isso é dado dela, não decoração. */}
                   <View
                     style={{
                       width: 38,
                       height: 38,
-                      borderRadius: 19,
+                      borderRadius: theme.shape === 'sharp' ? radiusFor(theme, 10) : 19,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: theme.surfaceAlt,
+                      backgroundColor: vazada ? 'transparent' : theme.surfaceAlt,
+                      borderWidth: 1,
+                      borderColor: theme.border,
                     }}
                   >
                     <AppText size={17}>{isTransfer ? '⇄' : (category?.emoji ?? '💠')}</AppText>
@@ -167,8 +178,8 @@ export default function TransacoesScreen() {
       ))}
 
       {groups.length ? (
-        <AppText muted size={12} style={{ textAlign: 'center' }}>
-          Segure um lançamento pra excluir.
+        <AppText variant="hand" muted size={15} style={{ textAlign: 'center' }}>
+          segure um lançamento pra excluir
         </AppText>
       ) : null}
     </Screen>

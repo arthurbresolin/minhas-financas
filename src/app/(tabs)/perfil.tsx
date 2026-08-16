@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { updateMe } from '@/api';
 import { ApiError } from '@/api/client';
+import { Titulo } from '@/components/ng/titulo';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
@@ -48,20 +49,24 @@ export default function PerfilScreen() {
 
   return (
     <Screen>
-      <AppText variant="display">Perfil</AppText>
+      <Titulo chapeu="quem é você aqui" titulo="perfil" />
 
-      <Card style={{ gap: 4 }}>
-        <AppText variant="label" muted style={{ textTransform: 'uppercase' }}>
-          Conta
+      <Card destaque style={{ gap: 4 }}>
+        <AppText variant="label" muted size={10} style={{ textTransform: 'uppercase' }}>
+          conta
         </AppText>
-        <AppText variant="title">{user?.name || 'Sem nome'}</AppText>
-        <AppText muted>{user?.email}</AppText>
+        <AppText variant="condensed" size={20}>
+          {(user?.name || 'sem nome').toUpperCase()}
+        </AppText>
+        <AppText variant="mono" size={12} muted>
+          {user?.email}
+        </AppText>
       </Card>
 
       <Card style={{ gap: 14 }}>
         <View style={{ gap: 2 }}>
-          <AppText variant="label" muted style={{ textTransform: 'uppercase' }}>
-            Tempo de trabalho
+          <AppText variant="label" muted size={10} style={{ textTransform: 'uppercase' }}>
+            tempo de trabalho
           </AppText>
           <AppText muted size={13}>
             Com quanto vale sua hora, o app mostra cada gasto também em horas e dias
@@ -89,10 +94,15 @@ export default function PerfilScreen() {
       </Card>
 
       <Button title="Minhas contas" variant="ghost" onPress={() => router.push('/contas')} />
+      <Button
+        title={`Tema: ${theme.name}`}
+        variant="ghost"
+        onPress={() => router.push('/temas')}
+      />
       <Button title="Sair" variant="danger" onPress={() => void signOut()} />
 
-      <AppText muted size={12} style={{ textAlign: 'center' }}>
-        Tema: {theme.name} · a edição de temas chega no próximo bloco.
+      <AppText variant="hand" muted size={15} style={{ textAlign: 'center' }}>
+        @{user?.name?.split(' ')[0]?.toLowerCase() ?? 'você'}
       </AppText>
     </Screen>
   );

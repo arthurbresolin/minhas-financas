@@ -37,8 +37,13 @@ export default function CadastroScreen() {
 
   return (
     <Screen>
-      <View style={{ gap: 6, marginTop: 40, marginBottom: 12 }}>
-        <AppText variant="display">Criar conta</AppText>
+      <View style={{ gap: 4, marginTop: 40, marginBottom: 12 }}>
+        <AppText variant="mono" size={11} muted>
+          bem-vindo
+        </AppText>
+        <AppText variant="condensed" size={34}>
+          CRIAR CONTA
+        </AppText>
         <AppText muted>Leva menos de um minuto.</AppText>
       </View>
 

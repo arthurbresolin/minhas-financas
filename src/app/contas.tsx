@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { createAccount, listAccounts, type Account } from '@/api';
 import { ApiError } from '@/api/client';
+import { Titulo } from '@/components/ng/titulo';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
@@ -71,7 +72,7 @@ export default function ContasScreen() {
   return (
     <Screen>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <AppText variant="display">Contas</AppText>
+        <Titulo chapeu="onde seu dinheiro mora" titulo="contas" />
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <AppText muted size={20}>
             ✕
@@ -79,11 +80,11 @@ export default function ContasScreen() {
         </Pressable>
       </View>
 
-      <Card style={{ gap: 2 }}>
-        <AppText variant="label" muted style={{ textTransform: 'uppercase' }}>
-          Somando tudo
+      <Card destaque style={{ gap: 2 }}>
+        <AppText variant="label" muted size={10} style={{ textTransform: 'uppercase' }}>
+          somando tudo
         </AppText>
-        <AppText variant="mono" size={26} color={total < 0 ? theme.negative : theme.text}>
+        <AppText variant="numeric" size={34} color={total < 0 ? theme.negative : theme.text}>
           {formatMoney(total)}
         </AppText>
       </Card>

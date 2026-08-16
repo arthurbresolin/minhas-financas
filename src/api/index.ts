@@ -1,5 +1,6 @@
 import { api } from '@/api/client';
 import type { WorkTime } from '@/lib/format';
+import type { ThemeTokens } from '@/theme/tokens';
 
 export type User = {
   id: number;
@@ -8,6 +9,23 @@ export type User = {
   avatar_url: string | null;
   hourly_rate_cents: number | null;
   workday_hours: number;
+  active_theme_id: number | null;
+};
+
+/**
+ * Espelha `ThemeTokens` do backend — os valores visuais, sem id nem nome.
+ *
+ * É o mesmo formato de `ThemeTokens` do app, inclusive nos campos de
+ * personalidade opcionais: um tema salvo antes deles chega sem eles, e quem
+ * preenche é o `resolveTokens`.
+ */
+export type ApiThemeTokens = ThemeTokens;
+
+export type ApiTheme = {
+  id: number;
+  name: string;
+  is_preset: boolean;
+  tokens: ApiThemeTokens;
 };
 
 export type Account = {
@@ -114,5 +132,17 @@ export const createTransaction = (payload: {
 }) => api.post<Transaction>('/transactions', payload);
 
 export const deleteTransaction = (id: number) => api.delete<void>(`/transactions/${id}`);
+
+export const listThemes = () => api.get<ApiTheme[]>('/themes');
+
+export const updateTheme = (id: number, payload: { name?: string; tokens?: ApiThemeTokens }) =>
+  api.patch<ApiTheme>(`/themes/${id}`, payload);
+
+export const deleteTheme = (id: number) => api.delete<void>(`/themes/${id}`);
+
+export const activateTheme = (id: number) => api.post<ApiTheme>(`/themes/${id}/activate`, {});
+
+/** O editor sempre parte de um tema que já funciona, nunca de uma tela em branco. */
+export const duplicateTheme = (id: number) => api.post<ApiTheme>(`/themes/${id}/duplicate`, {});
 
 export const getSummary = (period: Period) => api.get<Summary>(`/summary?period=${period}`);
