@@ -6,6 +6,7 @@ from app.api.accounts import router as accounts_router
 from app.api.auth import router as auth_router
 from app.api.categories import router as categories_router
 from app.api.summary import router as summary_router
+from app.api.themes import router as themes_router
 from app.api.transactions import router as transactions_router
 from app.core.config import MEDIA_DIR
 
@@ -27,6 +28,7 @@ app.include_router(accounts_router)
 app.include_router(auth_router)
 app.include_router(categories_router)
 app.include_router(summary_router)
+app.include_router(themes_router)
 app.include_router(transactions_router)
 
 

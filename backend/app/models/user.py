@@ -22,4 +22,9 @@ class User(Base):
     # Quantas horas tem um dia de trabalho seu — usado só pra quebrar um total
     # de horas em "X dias e Y horas" de um jeito que faça sentido pra você.
     workday_hours: Mapped[int] = mapped_column(Integer, default=8)
+    # Tema ativo. Inteiro solto, sem ForeignKey de propósito: `themes.user_id`
+    # já aponta pra cá, e as duas chaves juntas fariam um ciclo que o SQLite não
+    # sabe ordenar na criação das tabelas. Nulo = ainda não escolheu, e a API
+    # devolve o primeiro preset.
+    active_theme_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

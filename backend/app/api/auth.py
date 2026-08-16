@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.api.themes import seed_presets
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models import Account, Category, DEFAULT_CATEGORIES, User
@@ -33,6 +34,7 @@ async def _seed_new_user(db: AsyncSession, user: User) -> None:
                 user_id=user.id, name=name, emoji=emoji, color=color, kind=kind, sort_order=order
             )
         )
+    await seed_presets(db, user)
 
 
 @router.post("/register", response_model=AuthResponse, status_code=201)

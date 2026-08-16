@@ -26,6 +26,7 @@ class UserRead(BaseModel):
     avatar_url: str | None
     hourly_rate_cents: int | None
     workday_hours: int
+    active_theme_id: int | None
 
 
 class UserUpdate(BaseModel):
