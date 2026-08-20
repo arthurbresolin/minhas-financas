@@ -1,0 +1,24 @@
+{
+  "model": "opus",
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run:*)",
+      "Bash(pytest:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/*.pem)",
+      "Bash(git push --force:*)",
+      "Bash(rm -rf /*)"
+    ]
+  }
+}
