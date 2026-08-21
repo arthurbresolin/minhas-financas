@@ -1,5 +1,13 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Rise } from '@/components/ui/motion';
@@ -17,6 +25,10 @@ import { useTheme } from '@/theme/use-theme';
  * Fecha tocando no escuro e pelo botão do sistema (o `onRequestClose` do
  * Modal) — nunca só por um "✕" desenhado, que é o jeito de prender alguém numa
  * gaveta em aparelho com gesto de voltar.
+ *
+ * Ela sobe junto com o teclado. Enquanto o valor era digitado num teclado
+ * desenhado dentro do app isso não fazia falta; com o teclado do sistema, sem
+ * isso o botão de confirmar fica embaixo dele — a gaveta abre e a ação some.
  */
 export function Sheet({
   visible,
@@ -36,7 +48,13 @@ export function Sheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <KeyboardAvoidingView
+        // `padding` no iOS e `height` no Android: é a combinação que a própria
+        // documentação do React Native recomenda, porque o Android já reduz a
+        // janela sozinho e `padding` ali empurraria a gaveta duas vezes.
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+      >
         <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: alpha('#000000', 0.55) }} onPress={onClose} />
         <Rise>
           <View
@@ -74,7 +92,7 @@ export function Sheet({
             </ScrollView>
           </View>
         </Rise>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

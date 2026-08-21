@@ -2,12 +2,16 @@ import { defineConfig } from 'vitest/config';
 import path from 'node:path';
 
 /**
- * Testes só da lógica pura de `src/lib`.
+ * Testes da lógica pura: `src/lib` e `src/theme`.
  *
- * Não há jsdom nem react-native aqui de propósito: o que precisa de teste
- * automático neste app é a conta de dinheiro — a calculadora do teclado, a
- * conversão de centavos, o tempo de trabalho. Essas funções não sabem o que é
- * um componente, e testá-las não deve exigir montar um.
+ * Não há jsdom nem react-native aqui de propósito. O que precisa de teste
+ * automático neste app é a conta de dinheiro (centavos, tempo de trabalho) e a
+ * conta de cor (contraste do rótulo sobre o accent, o tema antigo que ainda
+ * carrega). Nenhuma das duas sabe o que é um componente, e testá-las não deve
+ * exigir montar um.
+ *
+ * `src/theme/use-theme.tsx` fica de fora por ser componente — o que dele vale
+ * testar (o `resolveTheme`) mora em `tokens.ts`, que é puro.
  *
  * O que é visual continua sendo verificado abrindo o app.
  */
@@ -17,6 +21,6 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    include: ['src/lib/**/*.test.ts'],
+    include: ['src/lib/**/*.test.ts', 'src/theme/**/*.test.ts'],
   },
 });

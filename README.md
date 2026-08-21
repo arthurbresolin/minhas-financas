@@ -6,7 +6,7 @@ dados presos no `localStorage` de um navegador só.
 
 A ideia central: **registrar tem que ser instantâneo** (é o atrito que mata todo
 app de finanças) e **dinheiro é tempo** — o app mostra cada gasto também em horas
-e dias do seu trabalho.
+e dias do seu trabalho, ou em dias da sua mesada.
 
 ## Rodar
 
@@ -19,26 +19,25 @@ uv run alembic upgrade head
 uv run fastapi dev app/main.py --port 8001
 
 # 2. app
-npx expo start                    # celular via Expo Go
+npx expo start                    # celular via Expo Go, no mesmo Wi-Fi
 npx expo start --web              # navegador
 ```
 
-A URL da API vem de `EXPO_PUBLIC_API_URL` no `.env` (veja `.env.example`). Ela é
-lida na hora de montar o bundle — **mudou o `.env`, reinicie o Expo**, senão o
-app continua chamando o endereço antigo.
-
-Pra abrir no celular, `localhost` não serve: precisa de `npx expo start --tunnel`
-e de um túnel público apontando pro backend.
+O endereço do backend é **deduzido**, não configurado: `src/api/client.ts` usa o
+`hostUri` do Expo, então trocar de Wi-Fi não exige editar nada. O
+`EXPO_PUBLIC_API_URL` do `.env` só entra em dois casos — `--tunnel` ou backend em
+outra máquina — e é lido na hora de montar o bundle, então **mudou o `.env`,
+reinicie o Expo**.
 
 ## Estrutura
 
 ```
 backend/          FastAPI + SQLAlchemy async + Alembic + SQLite  (ver backend/README.md)
 src/api/          client HTTP e tipos da API
-src/app/          telas (expo-router): (auth), (tabs), pix, meta, meta-batida,
-                  nova-transacao, atalho, navegar, perfil
+src/app/          telas (expo-router): (auth), (tabs), nova-transacao, meta,
+                  contas, atalho, temas
 src/components/   kit de UI próprio + barra de abas flutuante
-src/theme/        tokens do tema e useTheme()
+src/theme/        as cores do tema e useTheme()
 src/lib/          formatação de dinheiro/datas e guarda do token
 ```
 
@@ -48,11 +47,8 @@ src/lib/          formatação de dinheiro/datas e guarda do token
 lançamento de gasto e entrada, extrato, resumo por período (7d/30d/3m/6m) e
 tempo de trabalho.
 
-**Bloco 2 (feito)** — editor de temas e temas como "skins".
-
-**Desenho novo (feito)** — a partir do canvas do Claude Design: Home compacta
-com profundidade e movimento, metas (potes) com guardar/resgatar, tela de meta
-batida, aba "você" com nível/XP/sequência, Pix e lançamento em gaveta.
+**Metas (feito)** — potes com nome e emoji, guardar e resgatar, e quanto já foi
+guardado traduzido em tempo.
 
 **Atalho do iPhone (feito)** — dois toques nas costas do celular registram o
 gasto sem abrir o app. Ver a seção abaixo.
@@ -60,8 +56,11 @@ gasto sem abrir o app. Ver a seção abaixo.
 **Mesada (feito)** — quem não trabalha pelo dinheiro pode dizer isso, e o app
 inteiro troca de língua. Ver a seção abaixo.
 
-**Hub "navegar" (feito)** — o menu de tudo que não é aba: peles, contas,
-Atalho, Pix, perfil. Chega pelo "navegar →" da aba você.
+**Simplificação (feita, 20/08/2026)** — o app tinha crescido pra fora: tema como
+"skin" com editor próprio, hub de navegação, tela de Pix, gamificação com
+nível/XP/sequência, teclado numérico com calculadora, comemoração em tela cheia.
+Tudo isso saiu. O que ficou está descrito neste README, e o porquê está na seção
+[Um tema é uma paleta](#um-tema-é-uma-paleta).
 
 **Deploy preparado** — `Dockerfile`, Postgres e configuração de produção
 prontos. Falta só escolher onde hospedar: ver `backend/DEPLOY.md`.
@@ -73,21 +72,17 @@ prontos. Falta só escolher onde hospedar: ver `backend/DEPLOY.md`.
 - **Dinheiro é `int` de centavos**, do banco até a tela. Formatação só na borda
   (`src/lib/format.ts`).
 - **Saldo é sempre derivado**, nunca guardado — ver `backend/README.md`.
-- **`useTheme()` é o único acesso ao tema.** Nenhuma tela importa as cores
-  direto, pra que o editor do Bloco 2 não precise tocar em nenhuma delas.
+- **`useTheme()` é o único acesso ao tema.** Nenhuma tela importa uma cor
+  direto, pra que trocar de paleta não precise tocar em tela nenhuma.
 - **O "+" da barra de abas não é uma aba**, é a ação principal do app.
 - **`saved_cents` de uma meta é derivado** dos depósitos, pelo mesmo motivo do
   saldo. A exceção é `done_at`, que é o *instante* em que a meta bateu —
   resgatar depois não apaga a conquista.
 - **`just_completed` vem do servidor.** Só ele distingue "bateu agora" de "já
-  estava batida", e é essa diferença que dispara a tela de comemoração.
-- **XP é por cuidar do dinheiro, não por ter dinheiro.** Ver
-  `backend/app/services/gamification.py`.
-- **O endereço do backend é deduzido, não configurado.** `src/api/client.ts` usa
-  o `hostUri` do Expo — trocar de Wi-Fi não exige editar nada. O `.env` só vale
-  no `--tunnel` e com o backend em outra máquina.
-- **`npm test` roda só a lógica pura de `src/lib`** (vitest, sem jsdom). O que é
-  visual continua sendo verificado abrindo o app.
+  estava batida", e é essa diferença que dispara a comemoração.
+- **O endereço do backend é deduzido, não configurado** (acima).
+- **`npm test` roda a lógica pura de `src/lib` e `src/theme`** (vitest, sem
+  jsdom). O que é visual continua sendo verificado abrindo o app.
 - **`APP_PRODUCTION=true` recusa subir sem `APP_JWT_SECRET_KEY`.** Um segredo
   padrão que funciona é um segredo que vai esquecido pra produção.
 - **A URL do banco é normalizada** (`normalized_database_url`): provedores
@@ -95,47 +90,76 @@ prontos. Falta só escolher onde hospedar: ver `backend/DEPLOY.md`.
 
 ## Navegação
 
-Quatro abas e o "+": **carteira · extrato · [+] · metas · você** — os lugares
-onde se passa o dia. Tudo o mais (peles, contas, Atalho, perfil) é coisa de uma
-vez por mês e mora no hub `/navegar`, que abre pelo "navegar →" da aba você.
+Quatro abas e o "+": **carteira · extrato · [+] · metas · você**.
 
-Disputar uma aba com uma tela de configuração empurraria pra fora algo que se
-usa todo dia. Mas "uma vez por mês" não é "escondido": no hub essas telas são
-quadrados grandes, não botões empilhados no fim de um formulário.
+"Você" é o perfil, e é de lá que saem os três destinos que não são do dia a dia:
+contas, aparência e o Atalho do iPhone. Houve uma versão com um hub separado
+(`/navegar`) pra essas telas, com a aba "você" ocupada por nível e sequência —
+mas era uma tela a mais no caminho de tudo, e a gamificação não era o app.
+Três botões no fim do perfil dizem a mesma coisa sem tela intermediária.
 
-## Os packs de tema
+## Um tema é uma paleta
 
-Oito, em `backend/app/models/theme.py` e `src/theme/tokens.ts` — os dois
-**precisam estar idênticos**, e são gerados da mesma fonte pra isso. Seis são os
-packs originais do projeto (Padrão, NG preto & branco, Cyberpunk, Doce,
-Streetwear, Gamer); dois vieram do canvas do Claude Design (Neón, Vaporwave).
+Onze cores e a amostra da lista. Só isso — `src/theme/tokens.ts`.
 
-Um pack não é uma paleta: ele carrega forma, densidade e o desenho do cartão, do
-botão, do ícone e do fundo. É o que faz os oito serem apps diferentes em vez do
-mesmo app repintado — e é justamente o que faltava nos originais, que nasceram
-antes desses tokens existirem e por isso pareciam todos iguais.
+Houve uma versão em que o tema também decidia forma, densidade e o desenho do
+cartão, do botão, do ícone, do fundo e da decoração, mais três fontes
+escolhíveis, com um editor de 564 linhas por cima. A intenção era boa (oito
+packs que parecem apps diferentes, não o mesmo app repintado) e o custo foi
+alto: cada tela virou um `switch` em cima de um eixo de personalidade, e eram
+oito desenhos pra manter e testar em vez de um.
+
+Hoje o desenho do app é um só, escrito uma vez, e o que muda entre temas é a
+cor. Raio (`RADIUS`) e fontes (`FONTS`) são constantes no mesmo arquivo.
+
+Os oito packs vivem em `backend/app/models/theme.py` e `src/theme/tokens.ts`, e
+os dois **precisam estar idênticos** — `backend/tests/test_catalogo_de_temas.py`
+lê o arquivo TypeScript e compara, pra que divergir quebre um teste em vez de
+quebrar o app de alguém.
 
 ⚠️ **`sync_presets` apaga preset que saiu do catálogo.** Mexer em
 `FACTORY_THEMES` é destrutivo pros presets de todas as contas (temas criados
 pela pessoa nunca são tocados). Já apagou os packs de uma conta uma vez.
 
-## Movimento é tema — até onde
+Quem tiver tema próprio salvo da época do editor continua com ele na lista: o
+`tokens_json` antigo tem campos que não existem mais, e tanto o Pydantic quanto
+o `resolveTheme` os descartam em silêncio. Não houve migração de dados.
 
-O movimento é dividido em dois, e só um deles é opcional:
+## Movimento
 
-- **Essencial** — saldo contando de zero, barra preenchendo, gaveta subindo, o
-  "pop" de uma conquista. Isso mostra *de onde o número veio* e *quanto a barra
-  andou*: é informação, não enfeite. Roda em todo tema, sempre.
-- **Ambiente** — orbe flutuando, pulso, shimmer, o "+" quicando. É atmosfera, e
-  quem decide é o `decorationStyle` (`loops` em `src/theme/motion.ts`).
+Três peças, em `src/components/ui/motion.tsx`: o saldo contando de zero
+(`useCountUp`), a barra preenchendo (`Fill`) e a gaveta subindo (`Rise`).
 
-A primeira versão deixava um tema desligar *tudo*, e o resultado foi um tema em
-que nada se mexia — não ficou sóbrio, ficou morto. **Um tema pode ser quieto;
-nenhum pode ser morto.** A única chave que desliga o essencial é o "Reduzir
-movimento" do aparelho, que é escolha da pessoa e não de design.
+Todas carregam informação — mostram *de onde o número veio* e *quanto a barra
+andou*. As de ambiente (orbe flutuando, pulso, shimmer, o "+" quicando, confete)
+saíram junto com os eixos de personalidade do tema: eram atmosfera, e atmosfera
+não paga o custo de manter.
 
-Toda peça de movimento renderiza o **estado final** quando não pode animar:
-animação interrompida no meio nunca deixa a tela num estado errado.
+Nenhuma pergunta nada ao tema. A única chave que desliga é o "Reduzir movimento"
+do aparelho, que é escolha da pessoa e não de design.
+
+Toda peça renderiza o **estado final** quando não pode animar: animação
+interrompida no meio nunca deixa a tela num estado errado.
+
+## O campo de valor
+
+`src/components/ui/money-input.tsx` — a pessoa digita só números e os centavos
+preenchem da direita pra esquerda: 5 vira R$ 0,05, 500 vira R$ 5,00. É como todo
+app de banco faz, e é o que evita a briga com a vírgula no meio da digitação.
+
+O `TextInput` de verdade cobre o bloco inteiro com texto transparente e sem
+cursor; quem aparece é o número grande formatado embaixo. Ele precisa ter área
+de verdade — um campo escondido em altura zero não recebe toque com confiança.
+
+Houve um teclado numérico desenhado à mão, com calculadora (`src/lib/calc.ts`):
+somava duas compras num lançamento só e rachava a conta. Era bom e era caro —
+143 linhas de teclado, 21 de teste da calculadora, e o teclado do sistema faz o
+essencial de graça, com acessibilidade junto. Se a conta voltar a fazer falta, o
+lugar dela é aqui.
+
+⚠️ Onde o campo aparece dentro de gaveta (`Sheet`, `nova-transacao`), a gaveta
+precisa de `KeyboardAvoidingView` — sem isso o teclado do sistema cobre
+justamente o botão de confirmar.
 
 ## O Atalho do iPhone
 
@@ -183,20 +207,12 @@ pessoa pensa sobre o próprio dinheiro: um lanche é "3% da mesada", uma compra 
 botão de salvar acompanhar cada tecla sem ida à rede. Os dois lados têm testes
 travando os mesmos casos, que é o que impede a cópia de divergir.
 
-## O teclado com conta
+## Mover dinheiro de verdade — o que faltaria
 
-`src/lib/calc.ts` — soma, subtração, multiplicação, divisão e porcentagem, tudo
-em **centavos inteiros**, sem parênteses e sem precedência: lido da esquerda pra
-direita, como quem faz de cabeça. Resolve os dois casos reais de quem vai lançar
-um gasto — somar duas compras num lançamento só e rachar a conta.
-
-Uma conta deixada pela metade ("38,90 +") vale o que já dá pra saber dela, não
-zero: quem esquecer de apertar `=` não pode perder o gasto.
-
-## Pix, aproximação e guardar dinheiro de verdade
-
-Hoje a tela de Pix **registra** o lançamento no app — ela não move dinheiro, e
-diz isso na própria tela. O que falta pra cada peça ser real:
+Houve uma tela de Pix que **registrava** o lançamento e dizia na própria tela
+que não movia dinheiro. Ela saiu na simplificação: era uma tela inteira pra
+fazer o que o "+" já faz. O levantamento continua aqui porque o caminho não
+mudou — só a tela.
 
 **Receber por Pix** é o passo mais perto. Um PSP (Efí, Asaas, Mercado Pago,
 Celcoin, Starkbank) emite QR Code dinâmico por API e avisa por webhook quando

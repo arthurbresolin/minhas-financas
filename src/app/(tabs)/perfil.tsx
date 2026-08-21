@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 
 import { updateMe } from '@/api';
 import { ApiError } from '@/api/client';
@@ -66,6 +66,13 @@ export default function PerfilScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function confirmarSaida() {
+    Alert.alert('Sair da conta?', 'Você vai precisar entrar de novo com email e senha.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Sair', style: 'destructive', onPress: () => void signOut() },
+    ]);
   }
 
   return (
@@ -188,19 +195,19 @@ export default function PerfilScreen() {
         <Button title="Salvar" onPress={handleSave} loading={saving} />
       </Card>
 
-      {/* O Atalho fica aqui, e não só no hub, de propósito: é nesta tela que a
-          frase "quanto isso custou de você" acabou de ser configurada, e o
-          Atalho é o jeito mais rápido de alimentar essa conta. */}
+      {/* O Atalho fica logo abaixo da configuração de propósito: é aqui que a
+          frase "quanto isso custou de você" acabou de ser ajustada, e o Atalho
+          é o jeito mais rápido de alimentar essa conta. */}
       <Button
         title="Atalho do iPhone · lançar em 2 toques"
         variant="ghost"
         onPress={() => router.push('/atalho')}
       />
-      {/* Sem hub no meio: contas e aparência são dois destinos, e dois botões
-          dizem isso melhor que uma tela de quadrados grandes. */}
       <Button title="Minhas contas" variant="ghost" onPress={() => router.push('/contas')} />
       <Button title="Aparência" variant="ghost" onPress={() => router.push('/temas')} />
-      <Button title="Sair da conta" variant="danger" onPress={() => void signOut()} />
+      {/* Sair pede confirmação porque o caminho de volta é digitar a senha, e
+          o botão fica logo abaixo de outros dois que só navegam. */}
+      <Button title="Sair da conta" variant="danger" onPress={confirmarSaida} />
 
       <AppText variant="hand" muted size={15} style={{ textAlign: 'center' }}>
         @{user?.name?.split(' ')[0]?.toLowerCase() ?? 'você'}

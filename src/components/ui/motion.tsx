@@ -12,13 +12,13 @@ import Animated, {
 import { DURATION } from '@/theme/motion';
 
 /**
- * As quatro peças de movimento do app.
+ * As três peças de movimento do app.
  *
  * São só as que carregam informação: o saldo contando mostra de onde o número
- * veio, a barra preenchendo mostra quanto ela andou, o `Pop` e o `Rise` dizem
- * que algo novo chegou. As peças de ambiente que existiam aqui (pulso, orbe
- * flutuando, shimmer, "+" quicando, confete, anel) saíram com os eixos de
- * personalidade do tema — eram atmosfera, não informação.
+ * veio, a barra preenchendo mostra quanto ela andou, o `Rise` diz que a gaveta
+ * chegou. As peças de ambiente que existiam aqui (pulso, orbe flutuando,
+ * shimmer, "+" quicando, confete, anel) saíram com os eixos de personalidade do
+ * tema — eram atmosfera, não informação.
  *
  * Nenhuma pergunta nada ao tema: o tema é cor. Todas param quando o aparelho
  * está em "Reduzir movimento", que é uma escolha da pessoa.
@@ -80,33 +80,6 @@ export function useCountUp(target: number): number {
 // ---------------------------------------------------------------------------
 // Entradas
 // ---------------------------------------------------------------------------
-
-/** Aparece crescendo. */
-export function Pop({
-  children,
-  delay = 0,
-  style,
-}: {
-  children: ReactNode;
-  delay?: number;
-  style?: ViewStyle;
-}) {
-  const on = !useReducedMotion();
-  const t = useSharedValue(on ? 0 : 1);
-
-  useEffect(() => {
-    if (!on) return;
-    t.value = withDelay(delay, withTiming(1, { duration: DURATION.pop, easing: Easing.out(Easing.back(1.6)) }));
-  }, [on, delay, t]);
-
-  const animated = useAnimatedStyle(() => ({
-    opacity: t.value,
-    transform: [{ scale: 0.7 + t.value * 0.3 }],
-  }));
-
-  if (!on) return <View style={style}>{children}</View>;
-  return <Animated.View style={[style, animated]}>{children}</Animated.View>;
-}
 
 /** Sobe de baixo. O bottom sheet de lançar. */
 export function Rise({ children, style }: { children: ReactNode; style?: ViewStyle }) {

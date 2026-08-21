@@ -1,6 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -26,6 +33,10 @@ import { useTheme } from '@/theme/use-theme';
  * É uma diferença pequena de código e grande de sensação — lançar deixa de ser
  * "ir a outro lugar" e vira "resolver isso aqui e voltar", que é o que faz
  * alguém registrar o lanche em vez de deixar pra depois (e nunca fazer).
+ *
+ * A gaveta sobe junto com o teclado. Enquanto o valor era digitado num teclado
+ * desenhado dentro do app isso não fazia falta; com o teclado do sistema, sem
+ * isso o "salvar" fica embaixo dele — e salvar é a razão da gaveta existir.
  */
 export default function NovaTransacaoScreen() {
   const theme = useTheme();
@@ -98,7 +109,13 @@ export default function NovaTransacaoScreen() {
   const radius = 26;
 
   return (
-    <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+    <KeyboardAvoidingView
+      // `padding` no iOS e `height` no Android: é a combinação que a própria
+      // documentação do React Native recomenda, porque o Android já reduz a
+      // janela sozinho e `padding` ali empurraria a gaveta duas vezes.
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1, justifyContent: 'flex-end' }}
+    >
       {/* O escuro é clicável de ponta a ponta: fechar a gaveta tocando fora é
           o gesto que as pessoas já tentam antes de procurar um botão. */}
       <Pressable
@@ -256,6 +273,6 @@ export default function NovaTransacaoScreen() {
           </View>
         </View>
       </Rise>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

@@ -1,4 +1,4 @@
-import { Pressable, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 import { useRef } from 'react';
 
 import { AppText } from '@/components/ui/text';
@@ -15,10 +15,12 @@ import { useTheme } from '@/theme/use-theme';
  *
  * Antes isso era um teclado numérico desenhado à mão, com tecla de apagar e
  * layout próprio. Agora é o teclado do próprio celular — o mesmo que a pessoa
- * já sabe usar, com correção, acessibilidade e haptics de graça.
+ * já sabe usar, com acessibilidade e haptics de graça.
  *
- * O `TextInput` de verdade fica invisível por cima: o que aparece é o número
- * grande e formatado, mas quem recebe o toque e abre o teclado é o campo.
+ * O `TextInput` de verdade cobre o bloco inteiro, com texto transparente e sem
+ * cursor: quem aparece é o número grande e formatado embaixo. Ele *precisa* ter
+ * tamanho de verdade — a primeira versão escondia o campo numa View de altura
+ * zero, e um campo sem área não recebe toque com confiança.
  */
 export function MoneyInput({
   digits,
@@ -39,7 +41,7 @@ export function MoneyInput({
   const cents = centsFromDigits(digits);
 
   return (
-    <Pressable onPress={() => input.current?.focus()} style={{ alignItems: 'center', paddingVertical: 6 }}>
+    <View style={{ alignItems: 'center', paddingVertical: 6 }}>
       {label ? (
         <AppText variant="label" muted size={10} style={{ textTransform: 'uppercase' }}>
           {label}
@@ -50,23 +52,31 @@ export function MoneyInput({
         {formatMoney(cents)}
       </AppText>
 
-      {/* Sem `opacity: 0`: no Android um campo totalmente transparente às vezes
-          não recebe foco. Ele fica com tamanho zero e cor de fundo nenhuma, o
-          que dá no mesmo visualmente e continua focável. */}
-      <View style={{ height: 0, overflow: 'hidden' }}>
-        <TextInput
-          ref={input}
-          value={digits}
-          onChangeText={(texto) => onChangeDigits(texto.replace(/\D/g, '').slice(0, 11))}
-          keyboardType="number-pad"
-          autoFocus={autoFocus}
-          style={{ color: theme.text, fontFamily: FONTS.mono }}
-        />
-      </View>
-
       <AppText variant="mono" size={10} muted style={{ marginTop: 4 }}>
         os centavos entram sozinhos
       </AppText>
-    </Pressable>
+
+      <TextInput
+        ref={input}
+        value={digits}
+        onChangeText={(texto) => onChangeDigits(texto.replace(/\D/g, '').slice(0, 11))}
+        keyboardType="number-pad"
+        autoFocus={autoFocus}
+        caretHidden
+        // O leitor de tela anuncia o valor formatado, não a fila de dígitos.
+        accessibilityLabel={label ?? 'valor'}
+        accessibilityValue={{ text: formatMoney(cents) }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          color: 'transparent',
+          fontFamily: FONTS.mono,
+          textAlign: 'center',
+        }}
+      />
+    </View>
   );
 }

@@ -18,11 +18,25 @@
 ## Comandos
 
 ```bash
-npm install       # instalar dependências
-npm run dev       # rodar em desenvolvimento
-npm test          # rodar os testes
+npm install                                   # dependências do app
+npx expo start                                # app (Expo Go, mesmo Wi-Fi)
+npm test                                      # testes do app (vitest)
+npx tsc --noEmit                              # typecheck
+npx expo export --platform android            # bundla de verdade; pega erro de import
+
+cd backend
+uv sync                                       # dependências do backend
+uv run alembic upgrade head                   # migrações
+uv run fastapi dev app/main.py --port 8001    # backend
+uv run pytest                                 # testes do backend
 ```
+
+Antes de dizer que acabou: `npm test`, `uv run pytest` e `npx tsc --noEmit`.
 
 ## Stack
 
-Projeto Node.js. As dependências reais estão no `package.json` — consulte antes de sugerir biblioteca nova.
+App em Expo/React Native (SDK 54, expo-router) e backend em FastAPI +
+SQLAlchemy async + Alembic. As dependências reais estão no `package.json` e no
+`backend/pyproject.toml` — consulte antes de sugerir biblioteca nova.
+
+Detalhes de arquitetura e as decisões que valem lembrar estão no `README.md`.

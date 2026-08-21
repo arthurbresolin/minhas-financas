@@ -8,31 +8,28 @@ import { FALLBACK_THEMES, NOIR, resolveTheme, type Theme } from '@/theme/tokens'
 /**
  * Ponto único de acesso ao tema.
  *
- * Nenhum componente importa um tema direto — todos passam por `useTheme()`. É
- * o que permite a lista vir do servidor, o editor mexer nas cores e o app
- * inteiro repintar sem que nenhuma tela saiba de onde os tokens vieram.
+ * Nenhum componente importa uma cor direto — todos passam por `useTheme()`. É
+ * o que permite a lista vir do servidor e o app inteiro repintar sem que
+ * nenhuma tela saiba de onde as cores vieram.
  */
 type ThemeValue = {
   theme: Theme;
   themes: Theme[];
   setTheme: (id: number | string) => void;
-  /** Recarrega a lista depois de criar, editar ou apagar um tema. */
-  reload: () => Promise<void>;
 };
 
 const ThemeContext = createContext<ThemeValue>({
   theme: NOIR,
   themes: FALLBACK_THEMES,
   setTheme: () => {},
-  reload: async () => {},
 });
 
 /**
  * Achata a linha da API no formato plano que as telas consomem.
  *
- * Passa pelo `resolveTheme` porque um tema salvo antes dos tokens de
- * personalidade chega sem eles — é aqui que ele ganha os defaults, uma vez só,
- * em vez de cada componente ter que se defender de `undefined`.
+ * Passa pelo `resolveTheme` porque um tema salvo na versão em que o tema era
+ * uma "skin" chega com dezenas de campos que não existem mais — é aqui que
+ * eles são descartados, uma vez só, em vez de vazarem pras telas.
  */
 export function fromApi(theme: ApiTheme): Theme {
   return resolveTheme({
@@ -83,8 +80,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => {
     const theme = themes.find((item) => item.id === activeId) ?? themes[0] ?? NOIR;
-    return { theme, themes, setTheme, reload };
-  }, [themes, activeId, setTheme, reload]);
+    return { theme, themes, setTheme };
+  }, [themes, activeId, setTheme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
@@ -93,8 +90,8 @@ export function useTheme(): Theme {
   return useContext(ThemeContext).theme;
 }
 
-/** Para a loja e o editor; as telas comuns usam só `useTheme()`. */
+/** Para a lista de temas e o atalho da Home; as telas comuns usam `useTheme()`. */
 export function useThemePicker() {
-  const { theme, themes, setTheme, reload } = useContext(ThemeContext);
-  return { active: theme, themes, setTheme, reload };
+  const { theme, themes, setTheme } = useContext(ThemeContext);
+  return { active: theme, themes, setTheme };
 }
