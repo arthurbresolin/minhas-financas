@@ -5,12 +5,8 @@ import {
   IBMPlexMono_600SemiBold,
   useFonts as usePlexMono,
 } from '@expo-google-fonts/ibm-plex-mono';
-import { Inter_400Regular, Inter_500Medium, useFonts as useInter } from '@expo-google-fonts/inter';
-import {
-  SpaceGrotesk_500Medium,
-  SpaceGrotesk_700Bold,
-  useFonts as useGrotesk,
-} from '@expo-google-fonts/space-grotesk';
+import { Inter_400Regular, useFonts as useInter } from '@expo-google-fonts/inter';
+import { SpaceGrotesk_700Bold, useFonts as useGrotesk } from '@expo-google-fonts/space-grotesk';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
@@ -34,16 +30,19 @@ function RootNavigator() {
 
   return (
     <>
-      {/* Nem todo tema é escuro: no CHERRY e no ICE o relógio branco do sistema
-          sumiria no fundo claro. Quem manda é a luminância do fundo do tema. */}
+      {/* Nem todo tema é escuro: num fundo claro o relógio branco do sistema
+          sumiria. Quem manda é a luminância do fundo do tema. */}
       <StatusBar style={isLight(theme) ? 'dark' : 'light'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg } }}>
       <Stack.Protected guard={!!user}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="nova-transacao" options={{ presentation: 'modal' }} />
+        {/* As telas que sobem por cima: lançar e guardar são gestos rápidos,
+            não destinos. */}
+        <Stack.Screen name="nova-transacao" options={{ presentation: 'transparentModal', animation: 'fade' }} />
+        <Stack.Screen name="meta" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="atalho" />
         <Stack.Screen name="contas" />
         <Stack.Screen name="temas" />
-        <Stack.Screen name="tema-editor" />
       </Stack.Protected>
       <Stack.Protected guard={!user}>
         <Stack.Screen name="(auth)" />
@@ -54,8 +53,8 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
-  const [groteskReady] = useGrotesk({ SpaceGrotesk_500Medium, SpaceGrotesk_700Bold });
-  const [interReady] = useInter({ Inter_400Regular, Inter_500Medium });
+  const [groteskReady] = useGrotesk({ SpaceGrotesk_700Bold });
+  const [interReady] = useInter({ Inter_400Regular });
   const [monoReady] = usePlexMono({ IBMPlexMono_600SemiBold });
   // Do design NG.cash: condensada itálica pros títulos, Anton pro número
   // gigante do saldo e a manuscrita pros rabiscos.

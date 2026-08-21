@@ -1,10 +1,11 @@
 /**
- * Um tema não é uma paleta — é uma personalidade visual.
+ * Um tema é uma paleta. Só isso.
  *
- * Além das cores, um tema carrega *como* o app é desenhado: cartão de contorno
- * ou chapado, botão adesivo ou luminoso, fundo liso ou com grid, ícone de
- * traço ou geométrico. Cada um desses eixos é um token, então trocar de tema
- * troca o desenho inteiro sem nenhuma tela saber qual tema está ativo.
+ * A versão anterior fazia o tema decidir também a forma do cartão, o desenho do
+ * botão, o estilo do ícone, o fundo, a decoração, a densidade e três fontes.
+ * Dava oito apps diferentes pra manter, e cada tela virava um `switch` em cima
+ * de um eixo de personalidade. Trocar de tema agora troca a cor — o desenho do
+ * app é um só, escrito uma vez.
  *
  * Os temas de verdade vivem no banco, por usuário (`/themes`). O que está aqui
  * embaixo é só a cópia local dos presets de fábrica: é com ela que o app pinta
@@ -12,35 +13,7 @@
  * Precisa ser igual ao `FACTORY_THEMES` do backend.
  */
 
-/** A "vibe" do tema. É o eixo que a personalização usa como atalho. */
-export type ThemeStyle = 'clean' | 'soft' | 'bold' | 'playful' | 'futuristic';
-export type ThemeShape = 'sharp' | 'medium' | 'round';
-/** `line` = fundo transparente com fio de 1px; `outline` = traço grosso. */
-export type CardStyle = 'filled' | 'outline' | 'glass' | 'line';
-export type ButtonStyle = 'solid' | 'sticker' | 'outline' | 'glow';
-export type IconStyle = 'glyph' | 'doodle' | 'geometric' | 'pixel';
-export type NavStyle = 'floating' | 'dock' | 'minimal';
-export type BackgroundStyle = 'plain' | 'grid' | 'glow' | 'gradient';
-export type DecorationStyle = 'none' | 'minimal' | 'doodles' | 'glow' | 'outline';
-export type Density = 'compact' | 'regular' | 'roomy';
-
-export const THEME_STYLES: ThemeStyle[] = ['clean', 'soft', 'bold', 'playful', 'futuristic'];
-export const THEME_SHAPES: ThemeShape[] = ['sharp', 'medium', 'round'];
-export const CARD_STYLES: CardStyle[] = ['filled', 'outline', 'glass', 'line'];
-export const BUTTON_STYLES: ButtonStyle[] = ['solid', 'sticker', 'outline', 'glow'];
-export const ICON_STYLES: IconStyle[] = ['glyph', 'doodle', 'geometric', 'pixel'];
-export const NAV_STYLES: NavStyle[] = ['floating', 'dock', 'minimal'];
-export const BACKGROUND_STYLES: BackgroundStyle[] = ['plain', 'grid', 'glow', 'gradient'];
-export const DECORATION_STYLES: DecorationStyle[] = ['none', 'minimal', 'doodles', 'glow', 'outline'];
-export const DENSITIES: Density[] = ['compact', 'regular', 'roomy'];
-
-/**
- * Os tokens como chegam da API.
- *
- * Tudo que foi acrescentado depois do primeiro desenho é opcional: existe tema
- * salvo no banco desde antes desses campos, e um tema antigo tem que continuar
- * carregando. Quem preenche os buracos é o `resolveTheme`, num lugar só.
- */
+/** As cores de um tema, como chegam da API. */
 export type ThemeTokens = {
   bg: string;
   surface: string;
@@ -50,126 +23,76 @@ export type ThemeTokens = {
   textMuted: string;
   accent: string;
   onAccent: string;
-  /** Segundo acento: barra do segundo pote, brilho do cofrinho, gradientes. */
+  /** Segundo acento: barra do segundo pote, gráficos, gradientes. */
   accentAlt: string;
   positive: string;
   negative: string;
-  radius: number;
-  /**
-   * Herança do primeiro desenho, quando só existia "traço ou chapado". Continua
-   * aqui porque é o que permite adivinhar `cardStyle` e `buttonStyle` de um
-   * tema salvo antes deles existirem.
-   */
-  outlined: boolean;
-  /** Amostra da loja de temas. */
+  /** As duas cores da bolinha na lista de temas. */
   swatch: [string, string];
-  fontDisplay: string;
-  fontMono: string;
-  fontSans: string;
-
-  // --- Personalidade. Opcionais: tema antigo não tem nenhum deles. ---
-  style?: ThemeStyle;
-  shape?: ThemeShape;
-  cardStyle?: CardStyle;
-  buttonStyle?: ButtonStyle;
-  iconStyle?: IconStyle;
-  navStyle?: NavStyle;
-  backgroundStyle?: BackgroundStyle;
-  decorationStyle?: DecorationStyle;
-  density?: Density;
-  /** Uma palavra na miniatura: "seco", "doce". Vende a sensação, não a config. */
-  vibe?: string;
 };
 
-/** Os mesmos tokens depois do `resolveTheme`: sem buraco, ninguém checa `undefined`. */
-export type ResolvedTokens = Required<ThemeTokens>;
-
-/** Um tema como o app usa: os tokens resolvidos junto da identidade da linha. */
-export type Theme = ResolvedTokens & {
+/** Um tema como o app usa: as cores junto da identidade da linha. */
+export type Theme = ThemeTokens & {
   id: number | string;
   name: string;
   isPreset: boolean;
 };
 
 /**
- * Fontes fixas, fora do tema.
+ * Forma e espaço não são mais tema.
  *
- * `condensed`, `numeric` e `hand` são a assinatura do desenho e ficam de fora
- * do editor — trocar elas não muda a cor do app, muda o app. As três
- * escolhíveis (display, mono, sans) vêm do tema.
+ * Um número só para o app inteiro. Se um dia isso precisar variar, vira token
+ * de novo — mas variar por tema foi o que fez cada tela precisar perguntar
+ * "que formato eu tenho hoje?".
+ */
+export const RADIUS = 16;
+
+/**
+ * As fontes, fixas.
+ *
+ * São a assinatura do desenho: trocar elas não muda a cor do app, muda o app.
+ * Por isso saíram do tema — o tema muda a cor.
  */
 export const FONTS = {
+  display: 'SpaceGrotesk_700Bold',
+  mono: 'IBMPlexMono_600SemiBold',
+  sans: 'Inter_400Regular',
   condensed: 'Archivo_900Black_Italic',
   numeric: 'Anton_400Regular',
   hand: 'Caveat_700Bold',
 } as const;
 
-/** As famílias que o editor oferece. Espelha `ALLOWED_FONTS` do backend. */
-export const FONT_OPTIONS: { value: string; label: string }[] = [
-  { value: 'SpaceGrotesk_700Bold', label: 'Space Grotesk' },
-  { value: 'SpaceGrotesk_500Medium', label: 'Space Grotesk médio' },
-  { value: 'IBMPlexMono_600SemiBold', label: 'IBM Plex Mono' },
-  { value: 'Inter_400Regular', label: 'Inter' },
-  { value: 'Inter_500Medium', label: 'Inter médio' },
-  { value: 'Archivo_900Black_Italic', label: 'Archivo condensada' },
-  { value: 'Anton_400Regular', label: 'Anton' },
-  { value: 'Caveat_700Bold', label: 'Caveat manuscrita' },
-];
-
-/** Os tokens de cor que a seção avançada deixa mexer, na ordem em que aparecem. */
-export const COLOR_TOKENS: { key: keyof ThemeTokens; label: string; hint: string }[] = [
-  { key: 'bg', label: 'Fundo', hint: 'O fundo de todas as telas' },
-  { key: 'text', label: 'Texto', hint: 'A cor da maior parte do texto' },
-  { key: 'textMuted', label: 'Texto apagado', hint: 'Legendas e rótulos' },
-  { key: 'surface', label: 'Cartão', hint: 'O fundo dos cartões' },
-  { key: 'surfaceAlt', label: 'Cartão claro', hint: 'Cartões menores e campos' },
-  { key: 'border', label: 'Borda', hint: 'Contornos e divisórias' },
-  { key: 'accent', label: 'Destaque', hint: 'Botão principal e item ativo' },
-  { key: 'onAccent', label: 'Sobre o destaque', hint: 'O texto em cima do destaque' },
-  { key: 'accentAlt', label: 'Destaque 2', hint: 'Segunda cor de apoio' },
-  { key: 'positive', label: 'Positivo', hint: 'Dinheiro que entrou' },
-  { key: 'negative', label: 'Negativo', hint: 'Dinheiro que saiu' },
-];
-
 /**
- * Preenche a personalidade de um tema que não a tem.
+ * Achata um tema vindo da API.
  *
- * Um tema salvo antes desses tokens existirem chega só com cores. Adivinhar a
- * partir do `outlined` e do `radius` faz esse tema continuar parecido com o que
- * a pessoa escolheu, em vez de virar outro tema de repente. É o único lugar do
- * app que decide default de token — nenhuma tela usa `?? 'clean'`.
+ * Um tema salvo pela versão antiga chega com dezenas de campos de
+ * personalidade (`cardStyle`, `density`, `fontDisplay`…). Aqui só as cores são
+ * lidas; o resto é ignorado de propósito, então nenhum tema antigo quebra e
+ * nenhuma migração é necessária.
  */
-export function resolveTokens(tokens: ThemeTokens): ResolvedTokens {
-  const outlined = tokens.outlined;
-  const radius = tokens.radius;
-  return {
-    ...tokens,
-    style: tokens.style ?? (outlined ? 'bold' : 'clean'),
-    shape: tokens.shape ?? (radius <= 8 ? 'sharp' : radius <= 18 ? 'medium' : 'round'),
-    cardStyle: tokens.cardStyle ?? (outlined ? 'outline' : 'filled'),
-    buttonStyle: tokens.buttonStyle ?? (outlined ? 'sticker' : 'solid'),
-    iconStyle: tokens.iconStyle ?? 'glyph',
-    navStyle: tokens.navStyle ?? 'floating',
-    // O grid em perspectiva já era o fundo da Home antes desse token existir:
-    // manter é o que faz um tema antigo continuar idêntico.
-    backgroundStyle: tokens.backgroundStyle ?? 'grid',
-    decorationStyle: tokens.decorationStyle ?? (outlined ? 'outline' : 'minimal'),
-    density: tokens.density ?? 'regular',
-    vibe: tokens.vibe ?? '',
-  };
-}
-
 export function resolveTheme(theme: {
   id: number | string;
   name: string;
   isPreset: boolean;
   tokens: ThemeTokens;
 }): Theme {
+  const t = theme.tokens;
   return {
     id: theme.id,
     name: theme.name,
     isPreset: theme.isPreset,
-    ...resolveTokens(theme.tokens),
+    bg: t.bg,
+    surface: t.surface,
+    surfaceAlt: t.surfaceAlt,
+    border: t.border,
+    text: t.text,
+    textMuted: t.textMuted,
+    accent: t.accent,
+    onAccent: t.onAccent,
+    accentAlt: t.accentAlt,
+    positive: t.positive,
+    negative: t.negative,
+    swatch: [t.swatch?.[0] ?? t.accent, t.swatch?.[1] ?? t.bg],
   };
 }
 
@@ -177,201 +100,144 @@ export function resolveTheme(theme: {
 // Presets de fábrica (cópia local). Espelha `FACTORY_THEMES` do backend.
 // ---------------------------------------------------------------------------
 
-export const NOIR_TOKENS: ThemeTokens = {
-  bg: '#050505',
-  surface: '#0E0E0E',
-  surfaceAlt: '#171717',
-  border: '#333333',
+export const PADRAO_TOKENS: ThemeTokens = {
+  bg: '#0A0A0F',
+  surface: '#14141C',
+  surfaceAlt: '#1B1B26',
+  border: '#23232E',
+  text: '#F4F4F6',
+  textMuted: '#8A8A99',
+  accent: '#C6F24E',
+  onAccent: '#0A0A0F',
+  accentAlt: '#8B5CF6',
+  positive: '#63D6A0',
+  negative: '#FF6FB3',
+  swatch: ['#CDFF46', '#8B5CF6'],
+};
+
+export const NEON_TOKENS: ThemeTokens = {
+  bg: '#080B0A',
+  surface: '#101613',
+  surfaceAlt: '#161E1A',
+  border: '#1C2622',
+  text: '#EAF2EE',
+  textMuted: '#5F6B65',
+  accent: '#2BF58C',
+  onAccent: '#04140B',
+  accentAlt: '#8FE0B5',
+  positive: '#2BF58C',
+  negative: '#FF6FB3',
+  swatch: ['#2BF58C', '#080B0A'],
+};
+
+export const NG_TOKENS: ThemeTokens = {
+  bg: '#000000',
+  surface: '#0A0A0A',
+  surfaceAlt: '#141414',
+  border: '#2A2A2A',
   text: '#FFFFFF',
-  textMuted: '#9A9A9A',
+  textMuted: '#8A8A8A',
   accent: '#FFFFFF',
   onAccent: '#000000',
-  accentAlt: '#FF2D2D',
-  positive: '#FFFFFF',
-  negative: '#FF2D2D',
-  radius: 4,
-  outlined: true,
+  accentAlt: '#B14BFF',
+  positive: '#00E676',
+  negative: '#FF4D6D',
   swatch: ['#FFFFFF', '#000000'],
-  fontDisplay: 'Archivo_900Black_Italic',
-  fontMono: 'IBMPlexMono_600SemiBold',
-  fontSans: 'Inter_500Medium',
-  style: 'bold',
-  shape: 'sharp',
-  cardStyle: 'outline',
-  buttonStyle: 'sticker',
-  iconStyle: 'geometric',
-  navStyle: 'dock',
-  backgroundStyle: 'plain',
-  decorationStyle: 'outline',
-  density: 'compact',
-  vibe: 'seco',
 };
 
-export const CHERRY_TOKENS: ThemeTokens = {
-  bg: '#FFF7F2',
-  surface: '#FFFFFF',
-  surfaceAlt: '#FFEBE2',
-  border: '#F2D9CC',
-  text: '#2A1310',
-  textMuted: '#8B665C',
-  accent: '#D81E45',
-  onAccent: '#FFFFFF',
-  accentAlt: '#FF8FA8',
-  positive: '#1B8055',
-  negative: '#D81E45',
-  radius: 24,
-  outlined: false,
-  swatch: ['#D81E45', '#FFF7F2'],
-  fontDisplay: 'SpaceGrotesk_700Bold',
-  fontMono: 'IBMPlexMono_600SemiBold',
-  fontSans: 'Inter_400Regular',
-  style: 'playful',
-  shape: 'round',
-  cardStyle: 'filled',
-  buttonStyle: 'solid',
-  iconStyle: 'doodle',
-  navStyle: 'floating',
-  backgroundStyle: 'plain',
-  decorationStyle: 'doodles',
-  density: 'regular',
-  vibe: 'doce',
-};
-
-export const ICE_TOKENS: ThemeTokens = {
-  bg: '#FBFDFF',
-  surface: '#F1F7FC',
-  surfaceAlt: '#E6F0F8',
-  border: '#D8E6F0',
-  text: '#0E1D29',
-  textMuted: '#66808F',
-  accent: '#1E7FC4',
-  onAccent: '#FFFFFF',
-  accentAlt: '#8FCDEE',
-  positive: '#128371',
-  negative: '#CF4560',
-  radius: 18,
-  outlined: false,
-  swatch: ['#1E7FC4', '#FBFDFF'],
-  fontDisplay: 'SpaceGrotesk_500Medium',
-  fontMono: 'IBMPlexMono_600SemiBold',
-  fontSans: 'Inter_400Regular',
-  style: 'clean',
-  shape: 'medium',
-  cardStyle: 'glass',
-  buttonStyle: 'solid',
-  iconStyle: 'glyph',
-  navStyle: 'floating',
-  backgroundStyle: 'plain',
-  decorationStyle: 'none',
-  density: 'roomy',
-  vibe: 'limpo',
-};
-
-export const Y2K_TOKENS: ThemeTokens = {
-  bg: '#D5DBE4',
-  surface: '#EDF1F6',
-  surfaceAlt: '#C0C9D7',
-  border: '#9AA6B8',
-  text: '#0A1230',
-  textMuted: '#4E5B85',
-  accent: '#1B36D8',
-  onAccent: '#FFFFFF',
-  accentAlt: '#67D4FF',
-  positive: '#0A7F5E',
-  negative: '#D01050',
-  radius: 10,
-  outlined: false,
-  swatch: ['#C0C9D7', '#1B36D8'],
-  fontDisplay: 'Anton_400Regular',
-  fontMono: 'IBMPlexMono_600SemiBold',
-  fontSans: 'Inter_500Medium',
-  style: 'futuristic',
-  shape: 'medium',
-  cardStyle: 'filled',
-  buttonStyle: 'glow',
-  iconStyle: 'pixel',
-  navStyle: 'dock',
-  backgroundStyle: 'gradient',
-  decorationStyle: 'glow',
-  density: 'compact',
-  vibe: 'chrome',
-};
-
-export const MATCHA_TOKENS: ThemeTokens = {
-  bg: '#F6F4EA',
-  surface: '#FFFDF6',
-  surfaceAlt: '#EBEBDB',
-  border: '#DCDECA',
-  text: '#212719',
-  textMuted: '#6F7A66',
-  accent: '#4F8F5F',
-  onAccent: '#FFFFFF',
-  accentAlt: '#BCD6A4',
-  positive: '#4F8F5F',
-  negative: '#BC5A4C',
-  radius: 26,
-  outlined: false,
-  swatch: ['#4F8F5F', '#F6F4EA'],
-  fontDisplay: 'SpaceGrotesk_500Medium',
-  fontMono: 'IBMPlexMono_600SemiBold',
-  fontSans: 'Inter_400Regular',
-  style: 'soft',
-  shape: 'round',
-  cardStyle: 'filled',
-  buttonStyle: 'solid',
-  iconStyle: 'doodle',
-  navStyle: 'floating',
-  backgroundStyle: 'plain',
-  decorationStyle: 'minimal',
-  density: 'roomy',
-  vibe: 'calmo',
-};
-
-export const DIGITAL_TOKENS: ThemeTokens = {
-  bg: '#05060E',
-  surface: '#0B0D1A',
-  surfaceAlt: '#121529',
-  border: '#282E52',
-  text: '#E9ECFF',
-  textMuted: '#8189B5',
-  accent: '#7C5CFC',
-  onAccent: '#FFFFFF',
+export const CYBERPUNK_TOKENS: ThemeTokens = {
+  bg: '#07060D',
+  surface: '#0A0512',
+  surfaceAlt: '#120A1F',
+  border: '#241640',
+  text: '#F0E9FF',
+  textMuted: '#8B7BB0',
+  accent: '#FF2E88',
+  onAccent: '#0A0512',
   accentAlt: '#22E0FF',
   positive: '#22E0FF',
-  negative: '#FF4D8D',
-  radius: 14,
-  outlined: false,
-  swatch: ['#7C5CFC', '#22E0FF'],
-  fontDisplay: 'SpaceGrotesk_700Bold',
-  fontMono: 'IBMPlexMono_600SemiBold',
-  fontSans: 'Inter_400Regular',
-  style: 'futuristic',
-  shape: 'medium',
-  cardStyle: 'line',
-  buttonStyle: 'glow',
-  iconStyle: 'geometric',
-  navStyle: 'floating',
-  backgroundStyle: 'grid',
-  decorationStyle: 'glow',
-  density: 'compact',
-  vibe: 'neon',
+  negative: '#FF2E88',
+  swatch: ['#FF2E88', '#22E0FF'],
+};
+
+export const DOCE_TOKENS: ThemeTokens = {
+  bg: '#1A1622',
+  surface: '#241C2E',
+  surfaceAlt: '#2E2439',
+  border: '#3A2740',
+  text: '#FBF3FF',
+  textMuted: '#A99BB8',
+  accent: '#FFB3D9',
+  onAccent: '#241C2E',
+  accentAlt: '#C9B8FF',
+  positive: '#B6F5D8',
+  negative: '#FF8FA8',
+  swatch: ['#FFB3D9', '#C9B8FF'],
+};
+
+export const VAPORWAVE_TOKENS: ThemeTokens = {
+  bg: '#140A20',
+  surface: '#2A0F2E',
+  surfaceAlt: '#3A1642',
+  border: '#4A2456',
+  text: '#FDEBFF',
+  textMuted: '#A87FB8',
+  accent: '#FF6EC7',
+  onAccent: '#2A1140',
+  accentAlt: '#FFB86C',
+  positive: '#FFB86C',
+  negative: '#FF5C8A',
+  swatch: ['#FF6EC7', '#FFB86C'],
+};
+
+export const STREETWEAR_TOKENS: ThemeTokens = {
+  bg: '#0E0E0C',
+  surface: '#17170F',
+  surfaceAlt: '#1F1F16',
+  border: '#33331F',
+  text: '#F7F5EC',
+  textMuted: '#8F8C7A',
+  accent: '#F5C542',
+  onAccent: '#1A1A1A',
+  accentAlt: '#E0653A',
+  positive: '#F5C542',
+  negative: '#E0653A',
+  swatch: ['#F5C542', '#1A1A1A'],
+};
+
+export const GAMER_TOKENS: ThemeTokens = {
+  bg: '#060A14',
+  surface: '#0C1322',
+  surfaceAlt: '#121C30',
+  border: '#1D2B47',
+  text: '#E8F4FF',
+  textMuted: '#7590B5',
+  accent: '#22E0FF',
+  onAccent: '#060A14',
+  accentAlt: '#7C5CFC',
+  positive: '#22E0FF',
+  negative: '#FF5C7A',
+  swatch: ['#22E0FF', '#7C5CFC'],
 };
 
 /** Na mesma ordem do `FACTORY_THEMES` do backend. */
 export const FACTORY_PRESETS: { name: string; tokens: ThemeTokens }[] = [
-  { name: 'NOIR', tokens: NOIR_TOKENS },
-  { name: 'CHERRY', tokens: CHERRY_TOKENS },
-  { name: 'ICE', tokens: ICE_TOKENS },
-  { name: 'Y2K', tokens: Y2K_TOKENS },
-  { name: 'MATCHA', tokens: MATCHA_TOKENS },
-  { name: 'DIGITAL', tokens: DIGITAL_TOKENS },
+  { name: 'Padrão', tokens: PADRAO_TOKENS },
+  { name: 'Neón', tokens: NEON_TOKENS },
+  { name: 'NG preto & branco', tokens: NG_TOKENS },
+  { name: 'Cyberpunk', tokens: CYBERPUNK_TOKENS },
+  { name: 'Doce', tokens: DOCE_TOKENS },
+  { name: 'Vaporwave', tokens: VAPORWAVE_TOKENS },
+  { name: 'Streetwear', tokens: STREETWEAR_TOKENS },
+  { name: 'Gamer', tokens: GAMER_TOKENS },
 ];
 
+/** O tema que pinta a primeira tela, antes de qualquer resposta do servidor. */
 export const NOIR: Theme = resolveTheme({
-  id: 'noir',
-  name: 'NOIR',
+  id: 'padrao',
+  name: 'Padrão',
   isPreset: true,
-  tokens: NOIR_TOKENS,
+  tokens: PADRAO_TOKENS,
 });
 
 /** Reserva local: o app pinta a primeira tela com isso, sem rede e sem sessão. */

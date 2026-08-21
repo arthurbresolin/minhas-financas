@@ -5,8 +5,9 @@ from sqlalchemy import select
 
 from app.models import FACTORY_THEMES, Theme, User
 
-# Um tema como era salvo antes dos tokens de personalidade existirem: só cores,
-# fontes, raio e o antigo `outlined`. Existe linha assim no banco de verdade.
+# Um tema como era salvo quando o tema ainda era uma "skin": além das cores,
+# raio, fontes e sete eixos de personalidade. Existe linha assim no banco de
+# verdade, e ela precisa continuar carregando.
 TOKENS_ANTIGOS = {
     "bg": "#000000",
     "surface": "#0A0A0A",
@@ -19,12 +20,22 @@ TOKENS_ANTIGOS = {
     "accentAlt": "#B14BFF",
     "positive": "#00E676",
     "negative": "#FF4D6D",
+    "swatch": ["#FFFFFF", "#000000"],
     "radius": 16,
     "outlined": True,
-    "swatch": ["#FFFFFF", "#000000"],
     "fontDisplay": "SpaceGrotesk_700Bold",
     "fontMono": "IBMPlexMono_600SemiBold",
     "fontSans": "Inter_400Regular",
+    "style": "bold",
+    "shape": "sharp",
+    "cardStyle": "outline",
+    "buttonStyle": "sticker",
+    "iconStyle": "geometric",
+    "navStyle": "dock",
+    "backgroundStyle": "plain",
+    "decorationStyle": "outline",
+    "density": "compact",
+    "vibe": "seco",
 }
 
 
@@ -50,82 +61,26 @@ async def _first_preset(client, auth) -> dict:
 async def test_conta_nova_ja_vem_com_os_presets(client, auth):
     themes = (await client.get("/themes", headers=auth)).json()
 
+    primeiro_nome, primeiro_tokens = FACTORY_THEMES[0]
+
     assert len(themes) == len(FACTORY_THEMES)
     assert all(theme["is_preset"] for theme in themes)
-    # O NOIR é o primeiro: é o visual padrão do app.
-    assert themes[0]["name"] == "NOIR"
-    assert themes[0]["tokens"]["bg"] == "#050505"
-    # Um preset não é só paleta — ele carrega a personalidade inteira.
-    assert themes[0]["tokens"]["cardStyle"] == "outline"
-    assert themes[0]["tokens"]["density"] == "compact"
+    # O primeiro do catálogo é o visual padrão do app. Qual é ele vem do
+    # catálogo, não daqui: trocar de pack padrão não pode quebrar o teste.
+    assert themes[0]["name"] == primeiro_nome
+    assert themes[0]["tokens"]["bg"] == primeiro_tokens["bg"]
 
 
 @pytest.mark.asyncio
-async def test_duplicar_preset_gera_tema_editavel(client, auth):
+async def test_preset_entrega_a_paleta_inteira(client, auth):
+    """O app pinta a tela toda com estes onze campos — faltar um deixa buraco."""
     preset = await _first_preset(client, auth)
 
-    copy = (await client.post(f"/themes/{preset['id']}/duplicate", headers=auth)).json()
-
-    assert copy["is_preset"] is False
-    assert copy["name"] == "NOIR (meu)"
-    # A cópia nasce idêntica: o editor sempre parte de algo que já funciona.
-    assert copy["tokens"] == preset["tokens"]
-
-
-@pytest.mark.asyncio
-async def test_preset_nao_pode_ser_editado_nem_apagado(client, auth):
-    preset = await _first_preset(client, auth)
-
-    patched = await client.patch(f"/themes/{preset['id']}", headers=auth, json={"name": "outro"})
-    deleted = await client.delete(f"/themes/{preset['id']}", headers=auth)
-
-    assert patched.status_code == 403
-    assert deleted.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_editar_tema_proprio_salva_os_tokens(client, auth):
-    preset = await _first_preset(client, auth)
-    copy = (await client.post(f"/themes/{preset['id']}/duplicate", headers=auth)).json()
-    tokens = {**copy["tokens"], "accent": "#FF0000", "radius": 4}
-
-    response = await client.patch(
-        f"/themes/{copy['id']}", headers=auth, json={"name": "Meu tema", "tokens": tokens}
-    )
-
-    assert response.status_code == 200, response.text
-    assert response.json()["name"] == "Meu tema"
-    assert response.json()["tokens"]["accent"] == "#FF0000"
-    assert response.json()["tokens"]["radius"] == 4
-
-
-@pytest.mark.asyncio
-async def test_cor_invalida_e_recusada(client, auth):
-    preset = await _first_preset(client, auth)
-    copy = (await client.post(f"/themes/{preset['id']}/duplicate", headers=auth)).json()
-
-    response = await client.patch(
-        f"/themes/{copy['id']}",
-        headers=auth,
-        json={"tokens": {**copy["tokens"], "accent": "vermelho"}},
-    )
-
-    assert response.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_fonte_fora_da_lista_e_recusada(client, auth):
-    """Fonte inexistente não quebra o app — ele cai calado numa do sistema."""
-    preset = await _first_preset(client, auth)
-    copy = (await client.post(f"/themes/{preset['id']}/duplicate", headers=auth)).json()
-
-    response = await client.patch(
-        f"/themes/{copy['id']}",
-        headers=auth,
-        json={"tokens": {**copy["tokens"], "fontDisplay": "Comic Sans"}},
-    )
-
-    assert response.status_code == 422
+    esperados = {
+        "bg", "surface", "surfaceAlt", "border", "text", "textMuted",
+        "accent", "onAccent", "accentAlt", "positive", "negative", "swatch",
+    }
+    assert set(preset["tokens"]) == esperados
 
 
 @pytest.mark.asyncio
@@ -139,69 +94,40 @@ async def test_ativar_tema_grava_no_usuario(client, auth):
 
 
 @pytest.mark.asyncio
-async def test_apagar_tema_ativo_volta_pro_padrao(client, auth):
+async def test_um_usuario_nao_ativa_o_tema_do_outro(client, auth, other_auth):
     preset = await _first_preset(client, auth)
-    copy = (await client.post(f"/themes/{preset['id']}/duplicate", headers=auth)).json()
-    await client.post(f"/themes/{copy['id']}/activate", headers=auth)
 
-    response = await client.delete(f"/themes/{copy['id']}", headers=auth)
-    me = (await client.get("/auth/me", headers=auth)).json()
+    ativado = await client.post(f"/themes/{preset['id']}/activate", headers=other_auth)
 
-    assert response.status_code == 204
-    # Ficar apontando pra um id morto deixaria o app sem tema nenhum.
-    assert me["active_theme_id"] is None
-
-
-@pytest.mark.asyncio
-async def test_um_usuario_nao_ve_nem_edita_o_tema_do_outro(client, auth, other_auth):
-    preset = await _first_preset(client, auth)
-    meu = (await client.post(f"/themes/{preset['id']}/duplicate", headers=auth)).json()
-
-    listagem = (await client.get("/themes", headers=other_auth)).json()
-    lido = await client.patch(f"/themes/{meu['id']}", headers=other_auth, json={"name": "roubado"})
-    ativado = await client.post(f"/themes/{meu['id']}/activate", headers=other_auth)
-
-    assert meu["id"] not in [theme["id"] for theme in listagem]
-    assert lido.status_code == 404
+    # O id existe, mas é de outra conta: 404 e não 403, pra não confirmar que ele existe.
     assert ativado.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_tema_antigo_continua_carregando_e_ganha_personalidade(client, auth, session_factory):
-    """Tema salvo antes dos tokens de skin não pode virar erro 500 nem outro tema."""
-    theme_id = await _inserir_tema_cru(session_factory, "eu@example.com", "Antigo", TOKENS_ANTIGOS, False)
+async def test_tema_antigo_continua_carregando_so_com_as_cores(client, auth, session_factory):
+    """Nenhuma migração de dados rodou: o JSON velho tem campos que sumiram.
+
+    O Pydantic ignora chave desconhecida, então a linha antiga carrega e só as
+    cores são lidas. Se um dia isso virar `extra="forbid"`, a conta de quem
+    criou tema na versão do editor para de abrir a lista.
+    """
+    antigo = await _inserir_tema_cru(session_factory, "eu@example.com", "Meu antigo", TOKENS_ANTIGOS, False)
 
     themes = (await client.get("/themes", headers=auth)).json()
-    antigo = next(theme for theme in themes if theme["id"] == theme_id)
+    lido = next(theme for theme in themes if theme["id"] == antigo)
 
-    assert antigo["tokens"]["accent"] == "#FFFFFF"
-    # `outlined=True` era exatamente "cartão de traço, botão adesivo": o tema
-    # continua parecido com o que a pessoa escolheu em vez de virar outro.
-    assert antigo["tokens"]["cardStyle"] == "outline"
-    assert antigo["tokens"]["buttonStyle"] == "sticker"
-    assert antigo["tokens"]["style"] == "bold"
-    assert antigo["tokens"]["shape"] == "medium"
-    assert antigo["tokens"]["density"] == "regular"
-
-
-@pytest.mark.asyncio
-async def test_patch_sem_os_campos_novos_e_aceito(client, auth):
-    """App desatualizado manda só as cores — e isso tem que continuar salvando."""
-    preset = await _first_preset(client, auth)
-    copy = (await client.post(f"/themes/{preset['id']}/duplicate", headers=auth)).json()
-
-    response = await client.patch(
-        f"/themes/{copy['id']}", headers=auth, json={"tokens": {**TOKENS_ANTIGOS, "accent": "#00FF00"}}
-    )
-
-    assert response.status_code == 200, response.text
-    assert response.json()["tokens"]["accent"] == "#00FF00"
-    assert response.json()["tokens"]["cardStyle"] == "outline"
+    assert lido["tokens"]["accent"] == "#FFFFFF"
+    # Os eixos de personalidade não voltam na resposta: eles não existem mais.
+    assert "cardStyle" not in lido["tokens"]
+    assert "fontDisplay" not in lido["tokens"]
 
 
 @pytest.mark.asyncio
 async def test_conta_antiga_troca_os_presets_e_mantem_os_temas_dela(client, auth, session_factory):
-    velho = await _inserir_tema_cru(session_factory, "eu@example.com", "Gamer", TOKENS_ANTIGOS, True)
+    # Um nome que garantidamente saiu de catálogo, seja qual for o catálogo de
+    # hoje — fixar um nome real faria o teste quebrar quando ele voltasse.
+    fora_de_catalogo = "Pack Descontinuado"
+    velho = await _inserir_tema_cru(session_factory, "eu@example.com", fora_de_catalogo, TOKENS_ANTIGOS, True)
     meu = await _inserir_tema_cru(session_factory, "eu@example.com", "Meu", TOKENS_ANTIGOS, False)
     await client.post(f"/themes/{velho}/activate", headers=auth)
 
@@ -210,8 +136,8 @@ async def test_conta_antiga_troca_os_presets_e_mantem_os_temas_dela(client, auth
     me = (await client.get("/auth/me", headers=auth)).json()
 
     # O pack fora de catálogo sai; os de fábrica atuais entram; o tema que a
-    # pessoa criou nunca é tocado.
-    assert "Gamer" not in nomes
+    # pessoa criou na versão do editor nunca é tocado.
+    assert fora_de_catalogo not in nomes
     assert nomes[: len(FACTORY_THEMES)] == [name for name, _ in FACTORY_THEMES]
     assert meu in [theme["id"] for theme in themes]
     # Estava ativo o preset que sumiu: apontar pra id morto deixaria o app sem tema.
@@ -219,15 +145,18 @@ async def test_conta_antiga_troca_os_presets_e_mantem_os_temas_dela(client, auth
 
 
 @pytest.mark.asyncio
-async def test_eixo_de_personalidade_invalido_e_recusado(client, auth):
-    """`cardStyle` vira um `switch` no app — valor desconhecido cai calado no default."""
+async def test_criar_e_editar_tema_nao_existem_mais(client, auth):
+    """O editor saiu junto com as rotas. Sobraram listar e ativar."""
     preset = await _first_preset(client, auth)
-    copy = (await client.post(f"/themes/{preset['id']}/duplicate", headers=auth)).json()
 
-    response = await client.patch(
-        f"/themes/{copy['id']}",
-        headers=auth,
-        json={"tokens": {**copy["tokens"], "cardStyle": "banana"}},
-    )
+    criado = await client.post("/themes", headers=auth, json={"name": "x", "tokens": TOKENS_ANTIGOS})
+    editado = await client.patch(f"/themes/{preset['id']}", headers=auth, json={"name": "x"})
+    apagado = await client.delete(f"/themes/{preset['id']}", headers=auth)
+    duplicado = await client.post(f"/themes/{preset['id']}/duplicate", headers=auth)
 
-    assert response.status_code == 422
+    # 405 onde o caminho ainda existe com outro método (GET /themes), 404 onde
+    # o caminho inteiro sumiu.
+    assert criado.status_code == 405
+    assert editado.status_code == 404
+    assert apagado.status_code == 404
+    assert duplicado.status_code == 404

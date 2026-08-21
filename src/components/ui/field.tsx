@@ -1,6 +1,7 @@
 import { TextInput, View, type TextInputProps } from 'react-native';
 
 import { AppText } from '@/components/ui/text';
+import { FONTS } from '@/theme/tokens';
 import { useTheme } from '@/theme/use-theme';
 
 type Props = TextInputProps & { label: string };
@@ -23,7 +24,7 @@ export function Field({ label, style, ...rest }: Props) {
             paddingHorizontal: 14,
             paddingVertical: 13,
             color: theme.text,
-            fontFamily: theme.fontSans,
+            fontFamily: FONTS.sans,
             fontSize: 15,
           },
           style,

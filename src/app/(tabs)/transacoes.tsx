@@ -16,7 +16,6 @@ import { Card } from '@/components/ui/card';
 import { Screen } from '@/components/ui/screen';
 import { AppText } from '@/components/ui/text';
 import { formatDayLabel, formatMoney, formatTime } from '@/lib/format';
-import { radiusFor } from '@/theme/style';
 import { useTheme } from '@/theme/use-theme';
 
 const KIND_SIGN: Record<Transaction['kind'], number> = {
@@ -28,9 +27,6 @@ const KIND_SIGN: Record<Transaction['kind'], number> = {
 
 export default function TransacoesScreen() {
   const theme = useTheme();
-  // Nos temas desenhados a traço a bolinha da categoria é vazada; nos de
-  // superfície ela é preenchida.
-  const vazada = theme.cardStyle === 'outline' || theme.cardStyle === 'line';
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -143,10 +139,10 @@ export default function TransacoesScreen() {
                     style={{
                       width: 38,
                       height: 38,
-                      borderRadius: theme.shape === 'sharp' ? radiusFor(theme, 10) : 19,
+                      borderRadius: 19,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: vazada ? 'transparent' : theme.surfaceAlt,
+                      backgroundColor: theme.surfaceAlt,
                       borderWidth: 1,
                       borderColor: theme.border,
                     }}

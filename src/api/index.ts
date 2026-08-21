@@ -1,5 +1,5 @@
 import { api } from '@/api/client';
-import type { WorkTime } from '@/lib/format';
+import type { TimeCost } from '@/lib/format';
 import type { ThemeTokens } from '@/theme/tokens';
 
 export type User = {
@@ -9,16 +9,14 @@ export type User = {
   avatar_url: string | null;
   hourly_rate_cents: number | null;
   workday_hours: number;
+  /** De onde vem o dinheiro: você troca horas por ele, ou recebe mesada. */
+  income_mode: 'work' | 'allowance';
+  allowance_cents: number | null;
+  allowance_period: 'week' | 'month';
   active_theme_id: number | null;
 };
 
-/**
- * Espelha `ThemeTokens` do backend — os valores visuais, sem id nem nome.
- *
- * É o mesmo formato de `ThemeTokens` do app, inclusive nos campos de
- * personalidade opcionais: um tema salvo antes deles chega sem eles, e quem
- * preenche é o `resolveTokens`.
- */
+/** Espelha `ThemeTokens` do backend — as cores, sem id nem nome. */
 export type ApiThemeTokens = ThemeTokens;
 
 export type ApiTheme = {
@@ -83,8 +81,8 @@ export type Summary = {
     total_cents: number;
   }[];
   by_day: { day: string; expense_cents: number; income_cents: number }[];
-  expense_work_time: WorkTime | null;
-  balance_work_time: WorkTime | null;
+  expense_time_cost: TimeCost | null;
+  balance_time_cost: TimeCost | null;
 };
 
 type AuthResponse = { access_token: string };
@@ -97,8 +95,19 @@ export const loginUser = (email: string, password: string) =>
 
 export const getMe = () => api.get<User>('/auth/me');
 
-export const updateMe = (payload: Partial<Pick<User, 'name' | 'hourly_rate_cents' | 'workday_hours'>>) =>
-  api.patch<User>('/auth/me', payload);
+export const updateMe = (
+  payload: Partial<
+    Pick<
+      User,
+      | 'name'
+      | 'hourly_rate_cents'
+      | 'workday_hours'
+      | 'income_mode'
+      | 'allowance_cents'
+      | 'allowance_period'
+    >
+  >,
+) => api.patch<User>('/auth/me', payload);
 
 export const listAccounts = () => api.get<Account[]>('/accounts');
 
@@ -135,14 +144,69 @@ export const deleteTransaction = (id: number) => api.delete<void>(`/transactions
 
 export const listThemes = () => api.get<ApiTheme[]>('/themes');
 
-export const updateTheme = (id: number, payload: { name?: string; tokens?: ApiThemeTokens }) =>
-  api.patch<ApiTheme>(`/themes/${id}`, payload);
-
-export const deleteTheme = (id: number) => api.delete<void>(`/themes/${id}`);
-
 export const activateTheme = (id: number) => api.post<ApiTheme>(`/themes/${id}/activate`, {});
 
-/** O editor sempre parte de um tema que já funciona, nunca de uma tela em branco. */
-export const duplicateTheme = (id: number) => api.post<ApiTheme>(`/themes/${id}/duplicate`, {});
-
 export const getSummary = (period: Period) => api.get<Summary>(`/summary?period=${period}`);
+
+// ---------------------------------------------------------------------------
+// Metas (potes)
+// ---------------------------------------------------------------------------
+
+export type Goal = {
+  id: number;
+  name: string;
+  emoji: string | null;
+  color: string | null;
+  target_cents: number;
+  done_at: string | null;
+  archived: boolean;
+  sort_order: number;
+  /** Derivado no servidor: a soma dos depósitos. */
+  saved_cents: number;
+  /** Já entre 0 e 1 — a barra da tela não precisa se defender. */
+  progress: number;
+  saved_time_cost: TimeCost | null;
+};
+
+export const listGoals = () => api.get<Goal[]>('/goals');
+
+export const createGoal = (payload: {
+  name: string;
+  target_cents: number;
+  emoji?: string | null;
+  color?: string | null;
+}) => api.post<Goal>('/goals', payload);
+
+export const updateGoal = (
+  id: number,
+  payload: Partial<Pick<Goal, 'name' | 'emoji' | 'color' | 'target_cents' | 'archived'>>,
+) => api.patch<Goal>(`/goals/${id}`, payload);
+
+export const deleteGoal = (id: number) => api.delete<void>(`/goals/${id}`);
+
+/**
+ * Guarda (positivo) ou resgata (negativo) num pote.
+ *
+ * `just_completed` vem do servidor porque só ele sabe se *este* depósito foi o
+ * que bateu a meta — é o que dispara a tela de comemoração uma vez só.
+ */
+export const depositGoal = (id: number, amount_cents: number) =>
+  api.post<{ goal: Goal; just_completed: boolean }>(`/goals/${id}/deposit`, { amount_cents });
+
+// ---------------------------------------------------------------------------
+// Atalho do iPhone
+// ---------------------------------------------------------------------------
+
+/**
+ * O token que vive dentro do Atalho, separado da senha.
+ *
+ * Ele só consegue criar lançamento — nunca ler saldo, nunca apagar nada — e
+ * pode ser revogado sozinho. É o que permite deixá-lo dentro de um Atalho no
+ * aparelho, onde qualquer pessoa com o celular na mão pode abrir e ler.
+ */
+export const getShortcutToken = () => api.get<{ token: string }>('/shortcut/token');
+
+/** Cria o token, ou troca o que já existia — o anterior morre na hora. */
+export const createShortcutToken = () => api.post<{ token: string }>('/shortcut/token', {});
+
+export const revokeShortcutToken = () => api.delete<void>('/shortcut/token');

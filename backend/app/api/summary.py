@@ -9,7 +9,7 @@ from app.db.session import get_db
 from app.models import Category, Transaction, User
 from app.schemas.summary import CategoryTotal, DayTotal, SummaryRead
 from app.services.balance import total_balance
-from app.services.worktime import work_time
+from app.services.timecost import time_cost
 
 router = APIRouter(prefix="/summary", tags=["summary"])
 
@@ -107,15 +107,9 @@ async def read_summary(
         income_cents=income_cents or 0,
         by_category=by_category,
         by_day=by_day,
-        expense_work_time=work_time(
-            expense_cents or 0, user.hourly_rate_cents, user.workday_hours
-        ),
+        expense_time_cost=time_cost(expense_cents or 0, user),
         # Só faz sentido falar em "tempo de trabalho guardado" com saldo
         # positivo — no vermelho, "0 horas guardadas" seria uma frase vazia
         # ocupando o lugar da informação que importa (o saldo negativo).
-        balance_work_time=(
-            work_time(balance_cents, user.hourly_rate_cents, user.workday_hours)
-            if balance_cents > 0
-            else None
-        ),
+        balance_time_cost=time_cost(balance_cents, user) if balance_cents > 0 else None,
     )

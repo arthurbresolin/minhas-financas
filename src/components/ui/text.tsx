@@ -6,28 +6,21 @@ import { useTheme } from '@/theme/use-theme';
 type Variant = 'display' | 'title' | 'body' | 'label' | 'mono' | 'condensed' | 'numeric' | 'hand';
 
 /**
- * As variantes montadas com as fontes do tema.
+ * As variantes de texto.
  *
- * Isso é uma função, não uma constante, porque as famílias vêm do tema.
- *
- * `condensed` é o título gritado das telas — e é justamente onde a diferença
- * entre um tema e outro mais aparece, então ele usa a fonte de display do tema
- * em vez de uma fixa. `numeric` e `hand` continuam fixas: o número do saldo em
- * Anton e o bilhetinho manuscrito são a assinatura do app, a parte que não
- * muda quando a pessoa troca de pele.
+ * As fontes são fixas: elas são a assinatura do app, a parte que não muda
+ * quando a pessoa troca de tema. O tema muda a cor do texto, não a família.
  */
-function variantsFor(display: string, mono: string, sans: string): Record<Variant, TextStyle> {
-  return {
-    display: { fontFamily: display, fontSize: 28, lineHeight: 36 },
-    title: { fontFamily: display, fontSize: 18, lineHeight: 26 },
-    body: { fontFamily: sans, fontSize: 15, lineHeight: 22 },
-    label: { fontFamily: sans, fontSize: 12, lineHeight: 18, letterSpacing: 0.6 },
-    mono: { fontFamily: mono, fontSize: 16, lineHeight: 24 },
-    condensed: { fontFamily: display, fontSize: 26, lineHeight: 32, letterSpacing: -1 },
-    numeric: { fontFamily: FONTS.numeric, fontSize: 38, lineHeight: 42, letterSpacing: 0.5 },
-    hand: { fontFamily: FONTS.hand, fontSize: 16, lineHeight: 20 },
-  };
-}
+const VARIANTS: Record<Variant, TextStyle> = {
+  display: { fontFamily: FONTS.display, fontSize: 28, lineHeight: 36 },
+  title: { fontFamily: FONTS.display, fontSize: 18, lineHeight: 26 },
+  body: { fontFamily: FONTS.sans, fontSize: 15, lineHeight: 22 },
+  label: { fontFamily: FONTS.sans, fontSize: 12, lineHeight: 18, letterSpacing: 0.6 },
+  mono: { fontFamily: FONTS.mono, fontSize: 16, lineHeight: 24 },
+  condensed: { fontFamily: FONTS.condensed, fontSize: 26, lineHeight: 32, letterSpacing: -1 },
+  numeric: { fontFamily: FONTS.numeric, fontSize: 38, lineHeight: 42, letterSpacing: 0.5 },
+  hand: { fontFamily: FONTS.hand, fontSize: 16, lineHeight: 20 },
+};
 
 type Props = TextProps & {
   variant?: Variant;
@@ -38,7 +31,7 @@ type Props = TextProps & {
 
 export function AppText({ variant = 'body', muted, color, size, style, ...rest }: Props) {
   const theme = useTheme();
-  const base = variantsFor(theme.fontDisplay, theme.fontMono, theme.fontSans)[variant];
+  const base = VARIANTS[variant];
   // Toda variante define lineHeight junto do fontSize. Trocar só o tamanho por
   // fora cortaria emoji e acento no topo — por isso `size` recalcula os dois.
   // O espaçamento entre letras também acompanha: a condensada usa um valor

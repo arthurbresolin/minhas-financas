@@ -2,15 +2,14 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, View } from 'react-native';
 
-import { getSummary, type Period, type Summary } from '@/api';
-import { Doodle, type DoodleName } from '@/components/ng/doodle';
-import { Pill } from '@/components/ng/pill';
+import { getSummary, listGoals, type Goal, type Period, type Summary } from '@/api';
 import { Card } from '@/components/ui/card';
+import { Fill, useCountUp } from '@/components/ui/motion';
 import { Screen } from '@/components/ui/screen';
 import { AppText } from '@/components/ui/text';
 import { useSession } from '@/hooks/use-session';
-import { formatMoney, formatWorkTime } from '@/lib/format';
-import { chipForeground, chipSkin, space } from '@/theme/style';
+import { formatMoney } from '@/lib/format';
+import { alpha, chipForeground, chipSkin } from '@/theme/style';
 import { useTheme, useThemePicker } from '@/theme/use-theme';
 
 const PERIODS: { key: Period; label: string }[] = [
@@ -20,42 +19,63 @@ const PERIODS: { key: Period; label: string }[] = [
   { key: '6m', label: '6m' },
 ];
 
-// Cada categoria recebe um rabisco fixo pela posição, não por sorteio: a mesma
-// categoria precisa ter sempre o mesmo desenho, senão a Home muda de cara a
-// cada recarregamento.
-const DOODLES: DoodleName[] = ['viagem', 'brilho', 'passaro', 'fantasma', 'olhos', 'cofrinho'];
+/** Só o valor abreviado, pra caber no rodapé de um pote: "3,1/5k". */
+function curto(cents: number): string {
+  const reais = cents / 100;
+  if (reais >= 1000) return `${(reais / 1000).toFixed(1).replace('.', ',')}k`;
+  return String(Math.round(reais));
+}
 
 export default function InicioScreen() {
   const theme = useTheme();
-  const { themes, setTheme, active } = useThemePicker();
+  const { themes } = useThemePicker();
   const router = useRouter();
   const { user } = useSession();
   const [period, setPeriod] = useState<Period>('30d');
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      setSummary(await getSummary(period));
-    } catch {
-      setSummary(null);
-    }
+    // Em paralelo e cada uma se defendendo sozinha: se as metas falharem, o
+    // saldo ainda aparece. Um `Promise.all` cru deixaria a Home vazia por
+    // causa de um endpoint só.
+    const [resumo, potes] = await Promise.all([
+      getSummary(period).catch(() => null),
+      listGoals().catch(() => [] as Goal[]),
+    ]);
+    setSummary(resumo);
+    setGoals(potes);
   }, [period]);
 
-  // Recarrega ao voltar pra aba: depois de lançar um gasto no modal, o saldo
-  // aqui precisa já estar certo quando a tela reaparece.
   useFocusEffect(
     useCallback(() => {
       void load();
     }, [load]),
   );
 
-  const expenseWorkTime = formatWorkTime(summary?.expense_work_time);
-  const balanceWorkTime = formatWorkTime(summary?.balance_work_time);
+  const balance = summary?.balance_cents ?? 0;
+  // O saldo sobe de zero até o valor — é o movimento que abre a tela e mostra
+  // de onde o número veio.
+  const contando = useCountUp(balance);
+  const [reais, centavos] = formatMoney(contando).split(',');
+  // A frase inteira vem do servidor: "18 dias e 2 horas de trabalho" ou
+  // "6 dias de mesada". A Home não sabe qual dos dois é, e é isso que faz
+  // trocar de modo não exigir tocar aqui.
+  const custoDoSaldo = summary?.balance_time_cost?.label ?? null;
+  const custoDosGastos = summary?.expense_time_cost?.label ?? null;
+  // A última frase escrita na mão: "você trabalhou" não vale pra quem recebe
+  // mesada. É a única coisa que a Home ainda decide sobre o modo, e só porque
+  // é uma frase de contexto, não o número em si.
+  const explicacaoDoCusto =
+    summary?.expense_time_cost?.mode === 'allowance'
+      ? 'É o quanto da sua mesada foi embora nesse período.'
+      : 'É o que você trabalhou pra pagar esse período.';
   const categories = summary?.by_category ?? [];
   const biggest = categories[0]?.total_cents ?? 0;
-  const balance = summary?.balance_cents ?? 0;
-  const [reais, centavos] = formatMoney(balance).split(',');
+  // Dois potes na Home; o resto mora na aba de metas.
+  const destaques = goals.slice(0, 2);
+  const negativo = balance < 0;
 
   return (
     <Screen
@@ -71,125 +91,125 @@ export default function InicioScreen() {
         />
       }
     >
+      {/* ---------------------------------------------------------------- */}
+      {/* Cabeçalho */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flexShrink: 1, marginRight: 8 }}>
-          <AppText variant="label" muted size={10} style={{ textTransform: 'uppercase' }}>
-            e aí
-          </AppText>
-          {/* Só o primeiro nome: nome completo em condensada de 26px estoura a
-              linha e empurra os pontinhos de tema pra fora da tela. */}
-          <AppText variant="condensed" numberOfLines={1}>
-            {(user?.name?.split(' ')[0] ?? 'você').toUpperCase()}
-          </AppText>
-        </View>
+        <AppText variant="title" size={14} numberOfLines={1} style={{ flexShrink: 1 }}>
+          e aí, {user?.name?.split(' ')[0] ?? 'você'}
+        </AppText>
 
-        {/* Os pontinhos de tema são o atalho da loja: um toque troca pro
-            próximo pack, um toque longo abre a lista inteira. */}
+        {/* A lista de temas a um toque, mostrando as cores do tema ativo. */}
         <Pressable
           onPress={() => router.push('/temas')}
           style={{
             flexDirection: 'row',
-            gap: 6,
+            gap: 4,
             alignItems: 'center',
             backgroundColor: theme.surface,
             borderWidth: 1,
             borderColor: theme.border,
-            borderRadius: 20,
-            paddingVertical: 6,
-            paddingHorizontal: 8,
+            borderRadius: 16,
+            paddingVertical: 7,
+            paddingHorizontal: 9,
           }}
         >
-          {/* Só os primeiros: com os temas que a pessoa cria, a lista inteira
-              estouraria a linha. A grade completa está em /temas. */}
-          {themes.slice(0, 4).map((item) => {
-            const selected = item.id === active.id;
-            return (
-              // O anel do tema ativo é uma View em volta, não uma borda: borda
-              // comeria o pontinho por dentro e ele sumiria nesse tamanho.
-              <View
-                key={item.id}
-                style={{
-                  padding: 2,
-                  borderRadius: 9,
-                  borderWidth: 1.5,
-                  borderColor: selected ? theme.text : 'transparent',
-                }}
-              >
-                <Pressable
-                  onPress={() => setTheme(item.id)}
-                  style={{
-                    width: 11,
-                    height: 11,
-                    borderRadius: 6,
-                    backgroundColor: item.swatch[0],
-                  }}
-                />
-              </View>
-            );
-          })}
+          {themes.slice(0, 2).map((item) => (
+            <View key={item.id} style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: item.swatch[0] }} />
+          ))}
         </Pressable>
       </View>
 
-      <Card destaque style={{ gap: 2, overflow: 'hidden' }}>
-        {/* O rabisco é decoração, e tema sem decoração não tem rabisco: é o que
-            faz um tema "clean" ficar realmente limpo em vez de só mais claro. */}
-        {theme.decorationStyle === 'doodles' || theme.decorationStyle === 'minimal' ? (
-          <View style={{ position: 'absolute', right: 12, top: 12 }}>
-            <Doodle name="passaro" color={theme.text} size={34} />
-          </View>
-        ) : null}
-        <AppText variant="label" muted size={10} style={{ textTransform: 'uppercase' }}>
-          saldo disponível
+      {/* ---------------------------------------------------------------- */}
+      {/* Saldo */}
+      <Card destaque>
+        <AppText variant="mono" size={10} muted style={{ letterSpacing: 1, textTransform: 'uppercase' }}>
+          saldo
         </AppText>
-        <AppText variant="numeric" color={balance < 0 ? theme.negative : theme.text}>
+        <AppText variant="numeric" size={34} color={negativo ? theme.negative : theme.text} style={{ marginTop: 2 }}>
           {reais}
-          <AppText variant="numeric" size={22} color={balance < 0 ? theme.negative : theme.text}>
+          <AppText variant="numeric" size={20} color={negativo ? theme.negative : theme.text}>
             ,{centavos}
           </AppText>
         </AppText>
-        {balanceWorkTime ? (
-          <AppText variant="mono" size={11} color={theme.positive}>
-            ≈ {balanceWorkTime} de trabalho ↑
-          </AppText>
-        ) : !user?.hourly_rate_cents ? (
-          // Sem valor por hora não dá pra converter nada — o convite só aparece
-          // pra quem ainda não informou, não pra quem está no vermelho.
-          <Pressable onPress={() => router.push('/perfil')}>
+        {custoDoSaldo ? (
+          // A pílula do tempo é o coração do app: o número acima é dinheiro, e
+          // este aqui é o que ele custou de vida.
+          <View
+            style={{
+              alignSelf: 'flex-start',
+              marginTop: 8,
+              backgroundColor: alpha(theme.accent, 0.12),
+              borderWidth: 1,
+              borderColor: alpha(theme.accent, 0.35),
+              borderRadius: 16,
+              paddingVertical: 4,
+              paddingHorizontal: 10,
+            }}
+          >
+            <AppText variant="mono" size={11} color={theme.positive}>
+              ≈ {custoDoSaldo}
+            </AppText>
+          </View>
+        ) : !summary?.balance_time_cost ? (
+          <Pressable onPress={() => router.push('/perfil')} style={{ marginTop: 8 }}>
             <AppText variant="mono" size={11} muted>
-              informe seu valor por hora →
+              diga de onde vem seu dinheiro →
             </AppText>
           </Pressable>
         ) : null}
       </Card>
 
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Pill
-          label="lançar"
-          variant="cheio"
-          style={{ flex: 1 }}
-          onPress={() => router.push('/nova-transacao')}
-        />
-        <Pill label="extrato" style={{ flex: 1 }} onPress={() => router.push('/transacoes')} />
-        <Pill label="⌗" style={{ width: 44 }} onPress={() => router.push('/contas')} />
-      </View>
+      {/* ---------------------------------------------------------------- */}
+      {/* Potes */}
+      {destaques.length ? (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {destaques.map((goal, index) => (
+            <Pressable key={goal.id} style={{ flex: 1 }} onPress={() => router.push('/metas')}>
+              <Card alt>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <AppText size={15}>{goal.emoji ?? '🫙'}</AppText>
+                  <AppText variant="mono" size={10} color={theme.positive}>
+                    {Math.round(goal.progress * 100)}%
+                  </AppText>
+                </View>
+                <View style={{ marginTop: 9 }}>
+                  <Fill
+                    progress={goal.progress}
+                    color={goal.color ?? theme.accent}
+                    track={alpha(theme.bg, 0.7)}
+                    height={5}
+                    delay={index * 120}
+                  />
+                </View>
+                <AppText variant="mono" size={9} muted style={{ marginTop: 6 }} numberOfLines={1}>
+                  {goal.name} {curto(goal.saved_cents)}/{curto(goal.target_cents)}
+                </AppText>
+              </Card>
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <Pressable onPress={() => router.push('/metas')}>
+          <Card alt>
+            <AppText size={13} muted>
+              🫙 Crie um pote e veja o dinheiro juntar →
+            </AppText>
+          </Card>
+        </Pressable>
+      )}
 
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      {/* ---------------------------------------------------------------- */}
+      {/* Período e recorte */}
+      <View style={{ flexDirection: 'row', gap: 6 }}>
         {PERIODS.map((item) => {
           const selected = item.key === period;
           return (
             <Pressable
               key={item.key}
               onPress={() => setPeriod(item.key)}
-              style={[
-                chipSkin(theme, selected),
-                { flex: 1, paddingVertical: space(theme, 8), alignItems: 'center' },
-              ]}
+              style={[chipSkin(theme, selected), { flex: 1, paddingVertical: 7, alignItems: 'center' }]}
             >
-              <AppText
-                variant="mono"
-                size={11}
-                color={selected ? chipForeground(theme, true) : theme.textMuted}
-              >
+              <AppText variant="mono" size={11} color={selected ? chipForeground(theme, true) : theme.textMuted}>
                 {item.label}
               </AppText>
             </Pressable>
@@ -197,8 +217,8 @@ export default function InicioScreen() {
         })}
       </View>
 
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Card style={{ flex: 1, gap: 2 }} alt>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Card alt style={{ flex: 1 }}>
           <AppText variant="label" muted size={10} style={{ textTransform: 'uppercase' }}>
             entrou
           </AppText>
@@ -206,7 +226,7 @@ export default function InicioScreen() {
             {formatMoney(summary?.income_cents ?? 0)}
           </AppText>
         </Card>
-        <Card style={{ flex: 1, gap: 2 }} alt>
+        <Card alt style={{ flex: 1 }}>
           <AppText variant="label" muted size={10} style={{ textTransform: 'uppercase' }}>
             saiu
           </AppText>
@@ -216,23 +236,21 @@ export default function InicioScreen() {
         </Card>
       </View>
 
-      {expenseWorkTime ? (
+      {custoDosGastos ? (
         <Card style={{ gap: 2 }}>
           <AppText variant="label" muted size={10} style={{ textTransform: 'uppercase' }}>
             custou de você
           </AppText>
           <AppText variant="condensed" size={20}>
-            {expenseWorkTime.toUpperCase()} DE TRABALHO
+            {custoDosGastos.toUpperCase()}
           </AppText>
           <AppText muted size={13}>
-            É o que você trabalhou pra pagar esse período.
+            {explicacaoDoCusto}
           </AppText>
         </Card>
       ) : null}
 
-      <View
-        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-      >
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <AppText variant="condensed" size={17}>
           PRA ONDE FOI
         </AppText>
@@ -244,54 +262,37 @@ export default function InicioScreen() {
       </View>
 
       {categories.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {categories.map((item, index) => (
-            <Card
-              key={item.category_id}
-              // Duas por linha: `48%` em vez de metade exata deixa a folga do gap.
-              style={{ width: '48%', gap: 8 }}
-              alt
-            >
-              {theme.decorationStyle === 'doodles' ? (
-                <Doodle
-                  name={DOODLES[index % DOODLES.length]}
-                  color={theme.text}
-                  size={26}
-                  strokeWidth={2}
-                />
-              ) : null}
-              <AppText variant="title" size={13} numberOfLines={1}>
-                {item.name}
-              </AppText>
-              <View style={{ height: 5, borderRadius: 3, backgroundColor: theme.border }}>
-                <View
-                  style={{
-                    height: 5,
-                    borderRadius: 3,
-                    // Barra proporcional ao maior gasto, não ao total: com
-                    // muitas categorias todas as barras ficariam invisíveis.
-                    width: `${biggest ? (item.total_cents / biggest) * 100 : 0}%`,
-                    backgroundColor: item.color ?? (index % 2 ? theme.accentAlt : theme.positive),
-                  }}
+            <Card alt key={item.category_id ?? `sem-${index}`} style={{ width: '48.5%' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <AppText size={13}>{item.emoji ?? '•'}</AppText>
+                <AppText variant="title" size={12} numberOfLines={1} style={{ flex: 1 }}>
+                  {item.name}
+                </AppText>
+              </View>
+              <View style={{ marginTop: 8 }}>
+                <Fill
+                  progress={biggest ? item.total_cents / biggest : 0}
+                  color={item.color ?? (index % 2 ? theme.accentAlt : theme.positive)}
+                  track={alpha(theme.bg, 0.7)}
+                  height={5}
+                  delay={index * 70}
                 />
               </View>
-              <AppText variant="mono" size={10} muted>
+              <AppText variant="mono" size={10} muted style={{ marginTop: 6 }}>
                 {formatMoney(item.total_cents)}
               </AppText>
             </Card>
           ))}
         </View>
       ) : (
-        <Card>
-          <AppText muted>Nenhum gasto neste período ainda.</AppText>
+        <Card alt>
+          <AppText muted size={13}>
+            Nenhum gasto neste período ainda.
+          </AppText>
         </Card>
       )}
-
-      <View style={{ alignItems: 'center', paddingTop: 4 }}>
-        <AppText variant="hand" size={16} muted>
-          @{user?.name?.split(' ')[0]?.toLowerCase() ?? 'você'}
-        </AppText>
-      </View>
     </Screen>
   );
 }

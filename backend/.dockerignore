@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# O banco de desenvolvimento não vai junto: em produção o banco é o do
+# provedor, e mandar este arquivo sobrescreveria dados reais por engano.
+minhas_financas.db
+media/
+.env

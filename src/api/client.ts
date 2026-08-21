@@ -1,6 +1,39 @@
+import Constants from 'expo-constants';
+
 import { getToken } from '@/lib/auth-storage';
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+/** A porta em que o backend roda em desenvolvimento. */
+const API_PORT = 8001;
+
+/**
+ * Onde está o backend.
+ *
+ * O aparelho não enxerga `localhost` — ali `localhost` é o próprio celular. Por
+ * isso precisa do IP da máquina na rede, e esse IP muda: troca de Wi-Fi, o
+ * roteador renova a concessão, e o app para de carregar sem dizer por quê. Já
+ * aconteceu duas vezes.
+ *
+ * Então em vez de deixá-lo escrito num `.env` que envelhece, ele é *deduzido*:
+ * o Expo já disse ao app de qual endereço o próprio código veio (`hostUri`), e
+ * o backend está na mesma máquina. Trocar de rede passa a não exigir nada.
+ *
+ * Duas exceções em que o `hostUri` não serve, e aí manda o `.env`:
+ * - **túnel** — o código vem de um domínio `.exp.direct`, mas a API não;
+ * - **backend em outra máquina** — ninguém adivinha isso.
+ */
+function descobrirBaseUrl(): string {
+  const configurado = process.env.EXPO_PUBLIC_API_URL;
+
+  // `hostUri` vem como "192.168.0.111:8081" (ou "localhost:8081" na web).
+  const host = Constants.expoConfig?.hostUri?.split(':')[0];
+  const ehIpLocal = !!host && /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+
+  if (ehIpLocal) return `http://${host}:${API_PORT}`;
+  if (configurado) return configurado;
+  return `http://localhost:${API_PORT}`;
+}
+
+export const API_BASE_URL = descobrirBaseUrl();
 
 export class ApiError extends Error {
   status?: number;

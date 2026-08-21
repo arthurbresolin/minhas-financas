@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { updateMe } from '@/api';
 import { ApiError } from '@/api/client';
@@ -11,32 +11,53 @@ import { Field } from '@/components/ui/field';
 import { Screen } from '@/components/ui/screen';
 import { AppText } from '@/components/ui/text';
 import { useSession } from '@/hooks/use-session';
-import { centsFromDigits, formatMoney } from '@/lib/format';
+import { centsFromDigits, formatMoney, previewTimeCost } from '@/lib/format';
+import { chipForeground, chipSkin } from '@/theme/style';
 import { useTheme } from '@/theme/use-theme';
 
 export default function PerfilScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { user, signOut, refresh } = useSession();
+  const { user, refresh, signOut } = useSession();
+  const [modo, setModo] = useState<'work' | 'allowance'>('work');
   const [rateDigits, setRateDigits] = useState('');
   const [workday, setWorkday] = useState('8');
+  const [mesadaDigits, setMesadaDigits] = useState('');
+  const [periodo, setPeriodo] = useState<'week' | 'month'>('month');
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (user?.hourly_rate_cents) setRateDigits(String(user.hourly_rate_cents));
     if (user?.workday_hours) setWorkday(String(user.workday_hours));
+    if (user?.allowance_cents) setMesadaDigits(String(user.allowance_cents));
+    if (user?.income_mode) setModo(user.income_mode);
+    if (user?.allowance_period) setPeriodo(user.allowance_period);
   }, [user]);
 
   const rateCents = centsFromDigits(rateDigits);
+  const mesadaCents = centsFromDigits(mesadaDigits);
+
+  // A prévia com um gasto concreto: um número abstrato não convence ninguém de
+  // que a conta faz sentido, mas "R$ 50 = 5 dias de mesada" convence na hora.
+  const exemplo = previewTimeCost(5_000, {
+    income_mode: modo,
+    hourly_rate_cents: rateCents,
+    workday_hours: parseInt(workday, 10) || 8,
+    allowance_cents: mesadaCents,
+    allowance_period: periodo,
+  });
 
   async function handleSave() {
     setStatus('');
     setSaving(true);
     try {
       await updateMe({
+        income_mode: modo,
         hourly_rate_cents: rateCents || null,
         workday_hours: Math.min(24, Math.max(1, parseInt(workday, 10) || 8)),
+        allowance_cents: mesadaCents || null,
+        allowance_period: periodo,
       });
       await refresh();
       setStatus('Salvo.');
@@ -66,40 +87,120 @@ export default function PerfilScreen() {
       <Card style={{ gap: 14 }}>
         <View style={{ gap: 2 }}>
           <AppText variant="label" muted size={10} style={{ textTransform: 'uppercase' }}>
-            tempo de trabalho
+            de onde vem seu dinheiro
           </AppText>
           <AppText muted size={13}>
-            Com quanto vale sua hora, o app mostra cada gasto também em horas e dias
-            de trabalho.
+            É com isso que o app traduz cada gasto: nem todo mundo troca horas por dinheiro, e
+            dizer "2 horas de trabalho" pra quem recebe mesada seria mentira.
           </AppText>
         </View>
 
-        <Field
-          label="Quanto vale sua hora"
-          value={rateCents ? formatMoney(rateCents) : ''}
-          onChangeText={(text) => setRateDigits(text.replace(/\D/g, ''))}
-          keyboardType="number-pad"
-          placeholder="R$ 0,00"
-        />
-        <Field
-          label="Horas por dia de trabalho"
-          value={workday}
-          onChangeText={(text) => setWorkday(text.replace(/\D/g, '').slice(0, 2))}
-          keyboardType="number-pad"
-          placeholder="8"
-        />
+        {/* A escolha vem antes dos campos de propósito: ela decide quais campos
+            fazem sentido, e mostrar os dois conjuntos juntos seria pedir que a
+            pessoa ignorasse metade da tela. */}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {([
+            { valor: 'work', rotulo: 'Eu trabalho' },
+            { valor: 'allowance', rotulo: 'Recebo mesada' },
+          ] as const).map((opcao) => {
+            const ativo = opcao.valor === modo;
+            return (
+              <Pressable
+                key={opcao.valor}
+                onPress={() => setModo(opcao.valor)}
+                style={[
+                  chipSkin(theme, ativo),
+                  { flex: 1, paddingVertical: 10, alignItems: 'center' },
+                ]}
+              >
+                <AppText variant="title" size={13} color={chipForeground(theme, ativo)}>
+                  {opcao.rotulo}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {modo === 'work' ? (
+          <>
+            <Field
+              label="Quanto vale sua hora"
+              value={rateCents ? formatMoney(rateCents) : ''}
+              onChangeText={(text) => setRateDigits(text.replace(/\D/g, ''))}
+              keyboardType="number-pad"
+              placeholder="R$ 0,00"
+            />
+            <Field
+              label="Horas por dia de trabalho"
+              value={workday}
+              onChangeText={(text) => setWorkday(text.replace(/\D/g, '').slice(0, 2))}
+              keyboardType="number-pad"
+              placeholder="8"
+            />
+          </>
+        ) : (
+          <>
+            <Field
+              label="Quanto você recebe"
+              value={mesadaCents ? formatMoney(mesadaCents) : ''}
+              onChangeText={(text) => setMesadaDigits(text.replace(/\D/g, ''))}
+              keyboardType="number-pad"
+              placeholder="R$ 0,00"
+            />
+            <View style={{ gap: 8 }}>
+              <AppText variant="label" muted style={{ textTransform: 'uppercase' }}>
+                De quanto em quanto tempo
+              </AppText>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {([
+                  { valor: 'week', rotulo: 'Por semana' },
+                  { valor: 'month', rotulo: 'Por mês' },
+                ] as const).map((opcao) => {
+                  const ativo = opcao.valor === periodo;
+                  return (
+                    <Pressable
+                      key={opcao.valor}
+                      onPress={() => setPeriodo(opcao.valor)}
+                      style={[
+                        chipSkin(theme, ativo),
+                        { flex: 1, paddingVertical: 9, alignItems: 'center' },
+                      ]}
+                    >
+                      <AppText size={13} color={chipForeground(theme, ativo)}>
+                        {opcao.rotulo}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* A prova de que a conta faz sentido, com um número que existe. */}
+        {exemplo ? (
+          <AppText variant="mono" size={12} color={theme.positive}>
+            um gasto de R$ 50,00 vira ≈ {exemplo}
+          </AppText>
+        ) : null}
 
         {status ? <AppText muted>{status}</AppText> : null}
         <Button title="Salvar" onPress={handleSave} loading={saving} />
       </Card>
 
-      <Button title="Minhas contas" variant="ghost" onPress={() => router.push('/contas')} />
+      {/* O Atalho fica aqui, e não só no hub, de propósito: é nesta tela que a
+          frase "quanto isso custou de você" acabou de ser configurada, e o
+          Atalho é o jeito mais rápido de alimentar essa conta. */}
       <Button
-        title={`Tema: ${theme.name}`}
+        title="Atalho do iPhone · lançar em 2 toques"
         variant="ghost"
-        onPress={() => router.push('/temas')}
+        onPress={() => router.push('/atalho')}
       />
-      <Button title="Sair" variant="danger" onPress={() => void signOut()} />
+      {/* Sem hub no meio: contas e aparência são dois destinos, e dois botões
+          dizem isso melhor que uma tela de quadrados grandes. */}
+      <Button title="Minhas contas" variant="ghost" onPress={() => router.push('/contas')} />
+      <Button title="Aparência" variant="ghost" onPress={() => router.push('/temas')} />
+      <Button title="Sair da conta" variant="danger" onPress={() => void signOut()} />
 
       <AppText variant="hand" muted size={15} style={{ textAlign: 'center' }}>
         @{user?.name?.split(' ')[0]?.toLowerCase() ?? 'você'}

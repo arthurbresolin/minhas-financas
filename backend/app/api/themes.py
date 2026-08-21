@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models import FACTORY_NAMES, FACTORY_THEMES, Theme, User
-from app.schemas.theme import ThemeCreate, ThemeRead, ThemeTokens, ThemeUpdate
+from app.schemas.theme import ThemeRead, ThemeTokens
 
 router = APIRouter(prefix="/themes", tags=["themes"])
 
@@ -40,10 +40,11 @@ async def sync_presets(db: AsyncSession, user: User, existentes: list[Theme]) ->
     Preset é cópia só-leitura da identidade visual do app, e ela muda com o
     produto: quando um pack novo entra, a conta antiga precisa recebê-lo sem
     migração de dados; quando um sai, a cópia velha tem que ir junto, senão a
-    loja de temas vira um cemitério de packs descontinuados.
+    lista de temas vira um cemitério de packs descontinuados.
 
-    Temas criados pela pessoa (`is_preset=False`) nunca são tocados aqui — e os
-    presets ela nunca pôde editar, então nada que ela fez se perde.
+    Temas criados pela pessoa na versão que tinha editor (`is_preset=False`)
+    nunca são tocados aqui: continuam na lista, mesmo sem editor pra criar
+    novos.
 
     Devolve se algo mudou, pra quem chamou saber se precisa commitar.
     """
@@ -94,64 +95,6 @@ async def list_themes(
     return [_to_read(theme) for theme in themes]
 
 
-@router.post("", response_model=ThemeRead, status_code=201)
-async def create_theme(
-    payload: ThemeCreate,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    theme = Theme(
-        user_id=user.id,
-        name=payload.name,
-        tokens_json=payload.tokens.model_dump_json(),
-        is_preset=False,
-    )
-    db.add(theme)
-    await db.commit()
-    await db.refresh(theme)
-    return _to_read(theme)
-
-
-@router.patch("/{theme_id}", response_model=ThemeRead)
-async def update_theme(
-    theme_id: int,
-    payload: ThemeUpdate,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    theme = await _get_owned_theme(db, user.id, theme_id)
-    if theme.is_preset:
-        # Preset é referência: se der pra editar, a pessoa perde o ponto de
-        # partida pra onde voltar quando o tema dela ficar ilegível.
-        raise HTTPException(status_code=403, detail="preset não pode ser editado; duplique antes")
-    if payload.name is not None:
-        theme.name = payload.name
-    if payload.tokens is not None:
-        theme.tokens_json = payload.tokens.model_dump_json()
-    db.add(theme)
-    await db.commit()
-    await db.refresh(theme)
-    return _to_read(theme)
-
-
-@router.delete("/{theme_id}", status_code=204)
-async def delete_theme(
-    theme_id: int,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    theme = await _get_owned_theme(db, user.id, theme_id)
-    if theme.is_preset:
-        raise HTTPException(status_code=403, detail="preset não pode ser apagado")
-    # Apagar o tema ativo deixaria o app apontando pra um id morto — volta pro
-    # padrão antes de sumir com a linha.
-    if user.active_theme_id == theme.id:
-        user.active_theme_id = None
-        db.add(user)
-    await db.delete(theme)
-    await db.commit()
-
-
 @router.post("/{theme_id}/activate", response_model=ThemeRead)
 async def activate_theme(
     theme_id: int,
@@ -163,23 +106,3 @@ async def activate_theme(
     db.add(user)
     await db.commit()
     return _to_read(theme)
-
-
-@router.post("/{theme_id}/duplicate", response_model=ThemeRead, status_code=201)
-async def duplicate_theme(
-    theme_id: int,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Ponto de entrada do editor: parte-se sempre de um tema que já funciona."""
-    original = await _get_owned_theme(db, user.id, theme_id)
-    copy = Theme(
-        user_id=user.id,
-        name=f"{original.name} (meu)"[:60],
-        tokens_json=original.tokens_json,
-        is_preset=False,
-    )
-    db.add(copy)
-    await db.commit()
-    await db.refresh(copy)
-    return _to_read(copy)

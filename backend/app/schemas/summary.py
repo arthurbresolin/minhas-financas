@@ -17,16 +17,26 @@ class DayTotal(BaseModel):
     income_cents: int
 
 
-class WorkTime(BaseModel):
-    """Quanto do seu tempo de trabalho aquele dinheiro custou.
+class TimeCost(BaseModel):
+    """Quanto do seu dinheiro-que-entra aquele gasto custou.
 
-    Nulo quando o usuário ainda não informou o valor da hora — melhor não
-    mostrar nada do que mostrar um número inventado sobre o trabalho de alguém.
+    Nulo quando o usuário ainda não informou de onde vem o dinheiro dele —
+    melhor não mostrar nada do que inventar um número sobre a vida de alguém.
+
+    `label` é a frase pronta ("2 horas de trabalho", "8% da mesada"), e é ela
+    que as telas mostram. Elas não sabem, nem precisam saber, se a pessoa
+    trabalha ou recebe mesada.
     """
 
+    # "work" ou "allowance".
+    mode: str
+    label: str
+    # Só no modo trabalho.
     total_hours: float
     days: int
     hours: int
+    # Só no modo mesada: a fração da mesada que aquilo custou. 0.08 = 8%.
+    ratio: float
 
 
 class SummaryRead(BaseModel):
@@ -38,5 +48,5 @@ class SummaryRead(BaseModel):
     income_cents: int
     by_category: list[CategoryTotal]
     by_day: list[DayTotal]
-    expense_work_time: WorkTime | None
-    balance_work_time: WorkTime | None
+    expense_time_cost: TimeCost | None
+    balance_time_cost: TimeCost | None

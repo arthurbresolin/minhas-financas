@@ -9,9 +9,9 @@ async def test_saldo_negativo_nao_reporta_tempo_de_trabalho_guardado(client, aut
 
     assert dados["balance_cents"] < 0
     # Nada de "0 horas guardadas" quando a pessoa está no vermelho.
-    assert dados["balance_work_time"] is None
+    assert dados["balance_time_cost"] is None
     # O que ela gastou continua aparecendo em tempo de trabalho.
-    assert dados["expense_work_time"] is not None
+    assert dados["expense_time_cost"] is not None
 
 
 async def test_saldo_positivo_reporta_tempo_de_trabalho_guardado(client, auth):
@@ -24,4 +24,5 @@ async def test_saldo_positivo_reporta_tempo_de_trabalho_guardado(client, auth):
 
     dados = (await client.get("/summary?period=30d", headers=auth)).json()
 
-    assert dados["balance_work_time"] == {"total_hours": 8.0, "days": 1, "hours": 0}
+    custo = dados["balance_time_cost"]
+    assert (custo["days"], custo["hours"], custo["total_hours"]) == (1, 0, 8.0)

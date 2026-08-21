@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from app.services.worktime import work_time
+from app.models import User
+from app.services.timecost import time_cost
 
 
 async def _conta(client, auth) -> int:
@@ -57,27 +58,38 @@ async def test_tempo_de_trabalho_so_aparece_com_valor_da_hora(client, auth):
     )
 
     sem_valor_hora = (await client.get("/summary?period=30d", headers=auth)).json()
-    assert sem_valor_hora["expense_work_time"] is None
+    assert sem_valor_hora["expense_time_cost"] is None
 
     # R$ 25,00/hora, dia de 8h: R$ 200,00 gastos = 8 horas = 1 dia.
     await client.patch("/auth/me", json={"hourly_rate_cents": 2_500}, headers=auth)
     com_valor_hora = (await client.get("/summary?period=30d", headers=auth)).json()
-    assert com_valor_hora["expense_work_time"] == {"total_hours": 8.0, "days": 1, "hours": 0}
+    custo = com_valor_hora["expense_time_cost"]
+    assert (custo["days"], custo["hours"], custo["total_hours"]) == (1, 0, 8.0)
+    assert custo["mode"] == "work"
+    # A frase vem pronta do servidor — é ela que as telas mostram.
+    assert custo["label"] == "1 dia de trabalho"
 
 
-def test_work_time_quebra_em_dias_e_horas():
+def _trabalhador(hourly_rate_cents: int | None, workday_hours: int = 8) -> User:
+    return User(
+        email="x@x", password_hash="x", income_mode="work",
+        hourly_rate_cents=hourly_rate_cents, workday_hours=workday_hours,
+        allowance_cents=None, allowance_period="month",
+    )
+
+
+def test_time_cost_quebra_em_dias_e_horas():
     # R$ 30,00/hora, dia de 8h → R$ 300,00 = 10 horas = 1 dia e 2 horas.
-    assert work_time(30_000, 3_000, 8) == work_time(30_000, 3_000, 8)
-    resultado = work_time(30_000, 3_000, 8)
+    resultado = time_cost(30_000, _trabalhador(3_000))
     assert (resultado.days, resultado.hours) == (1, 2)
 
 
-def test_work_time_nao_mostra_dia_incompleto_arredondado_pra_cima():
+def test_time_cost_nao_mostra_dia_incompleto_arredondado_pra_cima():
     # 7,9h num dia de 8h arredondaria pra "0 dias e 8 horas" — tem que virar 1 dia.
-    resultado = work_time(int(7.9 * 1_000), 1_000, 8)
+    resultado = time_cost(int(7.9 * 1_000), _trabalhador(1_000))
     assert (resultado.days, resultado.hours) == (1, 0)
 
 
-def test_work_time_sem_valor_da_hora_e_nulo():
-    assert work_time(10_000, None, 8) is None
-    assert work_time(10_000, 0, 8) is None
+def test_time_cost_sem_valor_da_hora_e_nulo():
+    assert time_cost(10_000, _trabalhador(None)) is None
+    assert time_cost(10_000, _trabalhador(0)) is None
