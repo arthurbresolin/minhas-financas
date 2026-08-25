@@ -9,6 +9,8 @@ from app.db.session import get_db
 from app.models import Category, Transaction, User
 from app.schemas.summary import CategoryTotal, DayTotal, SummaryRead
 from app.services.balance import total_balance
+from app.services.faturas import hoje_utc
+from app.services.recorrentes import aplicar
 from app.services.timecost import time_cost
 
 router = APIRouter(prefix="/summary", tags=["summary"])
@@ -25,6 +27,10 @@ async def read_summary(
 ):
     if period not in PERIOD_DAYS:
         raise HTTPException(status_code=422, detail="período inválido")
+
+    # Antes de somar: um lançamento recorrente que já venceu precisa estar no
+    # resumo, senão o saldo da Home fica atrasado até alguém abrir o extrato.
+    await aplicar(db, user.id, hoje_utc())
 
     end = datetime.now(timezone.utc).replace(tzinfo=None)
     start = end - timedelta(days=PERIOD_DAYS[period])

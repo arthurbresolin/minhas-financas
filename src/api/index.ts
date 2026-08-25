@@ -26,6 +26,16 @@ export type ApiTheme = {
   tokens: ApiThemeTokens;
 };
 
+/** A fatura aberta de um cartão. Derivada no servidor, nunca guardada. */
+export type Fatura = {
+  /** Quanto já entrou nela. Positivo — é dívida, não saldo. */
+  total_cents: number;
+  fecha_em: string;
+  vence_em: string;
+  /** 0 quando fecha hoje. É o número que faz a pessoa segurar a compra. */
+  dias_ate_fechar: number;
+};
+
 export type Account = {
   id: number;
   name: string;
@@ -38,7 +48,10 @@ export type Account = {
   closing_day: number | null;
   due_day: number | null;
   archived: boolean;
+  /** Num cartão isto é negativo e significa "quanto se deve no total". */
   balance_cents: number;
+  /** Só em cartão de crédito com fechamento e vencimento configurados. */
+  fatura: Fatura | null;
 };
 
 export type Category = {
@@ -116,6 +129,8 @@ export const createAccount = (payload: {
   kind?: Account['kind'];
   icon?: string | null;
   opening_balance_cents?: number;
+  closing_day?: number | null;
+  due_day?: number | null;
 }) => api.post<Account>('/accounts', payload);
 
 export const updateAccount = (id: number, payload: Partial<Account>) =>
@@ -141,6 +156,19 @@ export const createTransaction = (payload: {
 }) => api.post<Transaction>('/transactions', payload);
 
 export const deleteTransaction = (id: number) => api.delete<void>(`/transactions/${id}`);
+
+/**
+ * Move dinheiro entre duas contas suas.
+ *
+ * É também como se paga a fatura do cartão: sai da conta, entra no cartão, e a
+ * dívida anda pra zero. Pagar fatura não precisou de conceito novo.
+ */
+export const createTransfer = (payload: {
+  from_account_id: number;
+  to_account_id: number;
+  amount_cents: number;
+  description?: string | null;
+}) => api.post<Transaction[]>('/transactions/transfer', payload);
 
 export const listThemes = () => api.get<ApiTheme[]>('/themes');
 
@@ -192,6 +220,45 @@ export const deleteGoal = (id: number) => api.delete<void>(`/goals/${id}`);
  */
 export const depositGoal = (id: number, amount_cents: number) =>
   api.post<{ goal: Goal; just_completed: boolean }>(`/goals/${id}/deposit`, { amount_cents });
+
+// ---------------------------------------------------------------------------
+// Lançamentos que se repetem
+// ---------------------------------------------------------------------------
+
+export type RecurringRule = {
+  id: number;
+  account_id: number;
+  category_id: number | null;
+  kind: 'expense' | 'income';
+  amount_cents: number;
+  description: string | null;
+  /** 1 a 31. Num mês curto o servidor joga pro último dia. */
+  day_of_month: number;
+  active: boolean;
+  start_on: string;
+  last_applied_on: string | null;
+  /** Quando vai gerar de novo. Nulo quando está desligada. */
+  proxima_em: string | null;
+};
+
+export const listRecurring = () => api.get<RecurringRule[]>('/recurring');
+
+export const createRecurring = (payload: {
+  account_id: number;
+  kind: RecurringRule['kind'];
+  amount_cents: number;
+  day_of_month: number;
+  description?: string | null;
+  category_id?: number | null;
+  start_on?: string | null;
+}) => api.post<RecurringRule>('/recurring', payload);
+
+export const updateRecurring = (
+  id: number,
+  payload: Partial<Pick<RecurringRule, 'amount_cents' | 'description' | 'day_of_month' | 'active'>>,
+) => api.patch<RecurringRule>(`/recurring/${id}`, payload);
+
+export const deleteRecurring = (id: number) => api.delete<void>(`/recurring/${id}`);
 
 // ---------------------------------------------------------------------------
 // Atalho do iPhone

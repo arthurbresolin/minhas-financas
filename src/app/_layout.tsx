@@ -42,6 +42,7 @@ function RootNavigator() {
         <Stack.Screen name="meta" options={{ presentation: 'modal' }} />
         <Stack.Screen name="atalho" />
         <Stack.Screen name="contas" />
+        <Stack.Screen name="recorrentes" />
         <Stack.Screen name="temas" />
       </Stack.Protected>
       <Stack.Protected guard={!user}>

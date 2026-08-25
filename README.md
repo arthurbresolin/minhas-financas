@@ -35,7 +35,7 @@ reinicie o Expo**.
 backend/          FastAPI + SQLAlchemy async + Alembic + SQLite  (ver backend/README.md)
 src/api/          client HTTP e tipos da API
 src/app/          telas (expo-router): (auth), (tabs), nova-transacao, meta,
-                  contas, atalho, temas
+                  contas, recorrentes, atalho, temas
 src/components/   kit de UI próprio + barra de abas flutuante
 src/theme/        as cores do tema e useTheme()
 src/lib/          formatação de dinheiro/datas e guarda do token
@@ -62,10 +62,16 @@ nível/XP/sequência, teclado numérico com calculadora, comemoração em tela c
 Tudo isso saiu. O que ficou está descrito neste README, e o porquê está na seção
 [Um tema é uma paleta](#um-tema-é-uma-paleta).
 
+**Cartão de crédito (feito)** — passar o cartão deixou de mexer no saldo. Ver
+[Cartão é fatura, não caixa](#cartão-é-fatura-não-caixa).
+
+**Recorrentes (feito)** — a mesada, a assinatura, o aluguel. Ver
+[O que se repete todo mês](#o-que-se-repete-todo-mês).
+
 **Deploy preparado** — `Dockerfile`, Postgres e configuração de produção
 prontos. Falta só escolher onde hospedar: ver `backend/DEPLOY.md`.
 
-**A fazer** — cartão de crédito e recorrentes · publicar o backend de fato.
+**A fazer** — publicar o backend de fato.
 
 ## Decisões que valem lembrar
 
@@ -83,6 +89,10 @@ prontos. Falta só escolher onde hospedar: ver `backend/DEPLOY.md`.
 - **O endereço do backend é deduzido, não configurado** (acima).
 - **`npm test` roda a lógica pura de `src/lib` e `src/theme`** (vitest, sem
   jsdom). O que é visual continua sendo verificado abrindo o app.
+- **`Alert.alert` não faz nada no `--web`.** O react-native-web não implementa
+  ele. As confirmações (pagar fatura, sair da conta, apagar meta ou repetição)
+  só funcionam no celular — que é o alvo. Testar esses caminhos no navegador dá
+  falso negativo.
 - **`APP_PRODUCTION=true` recusa subir sem `APP_JWT_SECRET_KEY`.** Um segredo
   padrão que funciona é um segredo que vai esquecido pra produção.
 - **A URL do banco é normalizada** (`normalized_database_url`): provedores
@@ -160,6 +170,54 @@ lugar dela é aqui.
 ⚠️ Onde o campo aparece dentro de gaveta (`Sheet`, `nova-transacao`), a gaveta
 precisa de `KeyboardAvoidingView` — sem isso o teclado do sistema cobre
 justamente o botão de confirmar.
+
+## Cartão é fatura, não caixa
+
+Passar o cartão **não tira dinheiro seu**. O dinheiro sai quando a fatura é
+paga. Até lá o gasto é dívida.
+
+Por isso o cartão fica **fora** do "somando tudo" (`total_balance` exclui
+`credit_card`), e o que se deve aparece à parte, com nome próprio. Somar o
+cartão no saldo fazia o número cair na hora da compra — que é exatamente a
+ilusão que o cartão cria na vida real e que este app existe pra desfazer.
+
+O ciclo tem dois dias, os dois escolhidos pelo banco: `closing_day` (depois
+dele o gasto já cai na fatura seguinte) e `due_day`. Um gasto feito **no** dia
+do fechamento ainda entra nele, que é o que a pessoa espera de "fecha dia 10".
+Cartão que fecha dia 31 fecha no último dia de fevereiro.
+
+A fatura é sempre **derivada** das transações, nunca guardada — mesmo motivo do
+saldo. `backend/app/services/faturas.py`.
+
+**Pagar a fatura é uma transferência** da conta pro cartão. Não precisou de
+conceito novo: as duas pernas já existiam, e o `transfer_in` no cartão empurra a
+dívida pra zero sem entrar na fatura como se fosse compra.
+
+Sem `closing_day` e `due_day` o app não mostra fatura nenhuma — inventar um dia
+padrão seria afirmar um vencimento que o banco nunca disse.
+
+## O que se repete todo mês
+
+A mesada, a assinatura, o aluguel: os valores que a pessoa esquece de registrar
+não por dar trabalho, mas por serem previsíveis demais pra lembrar.
+
+Uma regra (`recurring_rules`) **não é** uma transação — é a receita de como
+criar uma. O que ela gera são linhas comuns em `transactions`: aparecem no
+extrato, entram no resumo, dá pra apagar uma a uma.
+
+**Não há agendador.** A regra é materializada **na leitura**: quando o app pede
+extrato, resumo ou contas, o que já venceu e ainda não foi criado é criado ali.
+O efeito é o mesmo de um cron — abrir o app é o gatilho, e ninguém abre um app
+de finanças sem abrir o app — mas não existe processo pra morrer de madrugada
+sem ninguém ver.
+
+A idempotência mora em `last_applied_on`: abrir o app cinco vezes no dia do
+vencimento gera a mesada uma vez só. É o que os testes mais protegem.
+
+Nunca gera no futuro (um gasto que ainda não aconteceu faria o saldo de hoje
+incluir dinheiro que ainda está lá), "todo dia 31" cai no último dia dos meses
+curtos, e apagar a regra **não apaga** o que ela já lançou — aquilo foi dinheiro
+de verdade.
 
 ## O Atalho do iPhone
 

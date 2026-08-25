@@ -10,8 +10,11 @@ from app.schemas.account import (
     AccountCreate,
     AccountRead,
     AccountUpdate,
+    Fatura,
 )
 from app.services.balance import account_balances
+from app.services.faturas import ciclo_aberto, hoje_utc, total_do_ciclo
+from app.services.recorrentes import aplicar
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -37,19 +40,43 @@ def _with_balance(account: Account, balances: dict[int, int]) -> AccountRead:
     return data
 
 
+async def _com_fatura(db: AsyncSession, data: AccountRead, account: Account) -> AccountRead:
+    """Anexa a fatura aberta, quando a conta é um cartão configurado.
+
+    Sem `closing_day` e `due_day` não há ciclo — e inventar um dia padrão faria
+    o app afirmar uma data de vencimento que o banco nunca disse.
+    """
+    if account.kind != "credit_card" or not account.closing_day or not account.due_day:
+        return data
+
+    ciclo = ciclo_aberto(hoje_utc(), account.closing_day, account.due_day)
+    data.fatura = Fatura(
+        total_cents=await total_do_ciclo(db, account.id, ciclo),
+        fecha_em=ciclo.fechamento,
+        vence_em=ciclo.vencimento,
+        dias_ate_fechar=(ciclo.fechamento - hoje_utc()).days,
+    )
+    return data
+
+
 @router.get("", response_model=list[AccountRead])
 async def list_accounts(
     include_archived: bool = False,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # O saldo de cada conta precisa já contar o que se repete.
+    await aplicar(db, user.id, hoje_utc())
+
     query = select(Account).where(Account.user_id == user.id)
     if not include_archived:
         query = query.where(Account.archived.is_(False))
     result = await db.execute(query.order_by(Account.id))
     accounts = list(result.scalars().all())
     balances = await account_balances(db, user.id)
-    return [_with_balance(account, balances) for account in accounts]
+    return [
+        await _com_fatura(db, _with_balance(account, balances), account) for account in accounts
+    ]
 
 
 @router.post("", response_model=AccountRead, status_code=201)

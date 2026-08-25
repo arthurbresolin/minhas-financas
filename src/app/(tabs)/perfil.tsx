@@ -204,6 +204,7 @@ export default function PerfilScreen() {
         onPress={() => router.push('/atalho')}
       />
       <Button title="Minhas contas" variant="ghost" onPress={() => router.push('/contas')} />
+      <Button title="O que se repete todo mês" variant="ghost" onPress={() => router.push('/recorrentes')} />
       <Button title="Aparência" variant="ghost" onPress={() => router.push('/temas')} />
       {/* Sair pede confirmação porque o caminho de volta é digitar a senha, e
           o botão fica logo abaixo de outros dois que só navegam. */}

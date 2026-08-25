@@ -6,6 +6,7 @@ from app.api.accounts import router as accounts_router
 from app.api.auth import router as auth_router
 from app.api.categories import router as categories_router
 from app.api.goals import router as goals_router
+from app.api.recurring import router as recurring_router
 from app.api.shortcut import router as shortcut_router
 from app.api.summary import router as summary_router
 from app.api.themes import router as themes_router
@@ -32,6 +33,7 @@ app.include_router(accounts_router)
 app.include_router(auth_router)
 app.include_router(categories_router)
 app.include_router(goals_router)
+app.include_router(recurring_router)
 app.include_router(shortcut_router)
 app.include_router(summary_router)
 app.include_router(themes_router)

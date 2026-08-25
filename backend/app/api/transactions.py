@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.services.faturas import hoje_utc
+from app.services.recorrentes import aplicar
 from app.models import Account, Category, Transaction, User
 from app.schemas.transaction import (
     TransactionCreate,
@@ -65,6 +67,10 @@ async def list_transactions(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # O que se repete vira transação aqui: sem agendador, a leitura é o
+    # gatilho. Ver services/recorrentes.py.
+    await aplicar(db, user.id, hoje_utc())
+
     query = select(Transaction).where(Transaction.user_id == user.id)
     if account_id is not None:
         query = query.where(Transaction.account_id == account_id)

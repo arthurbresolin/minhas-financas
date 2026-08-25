@@ -42,15 +42,25 @@ async def account_balances(db: AsyncSession, user_id: int) -> dict[int, int]:
 
 
 async def total_balance(db: AsyncSession, user_id: int) -> int:
-    """Saldo somado de todas as contas não arquivadas.
+    """Quanto dinheiro a pessoa TEM: soma das contas de caixa não arquivadas.
 
     Conta arquivada fica de fora de propósito: ela existe pra preservar o
     histórico de transações antigas, não pra continuar contando como dinheiro
     disponível hoje.
+
+    **Cartão de crédito também fica de fora**, e essa é a parte que não é
+    óbvia. Passar o cartão não tira dinheiro seu — tira quando a fatura é paga.
+    Somar o cartão aqui fazia o saldo cair na hora da compra, que é justamente
+    a ilusão que o cartão cria na vida real e que este app existe pra desfazer.
+    O que se deve aparece à parte, como fatura (ver `services/faturas.py`).
     """
     balances = await account_balances(db, user_id)
     result = await db.execute(
-        select(Account.id).where(Account.user_id == user_id, Account.archived.is_(False))
+        select(Account.id).where(
+            Account.user_id == user_id,
+            Account.archived.is_(False),
+            Account.kind != "credit_card",
+        )
     )
     active_ids = {row[0] for row in result.all()}
     return sum(balance for account_id, balance in balances.items() if account_id in active_ids)
