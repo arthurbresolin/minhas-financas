@@ -28,7 +28,19 @@ cd backend
 uv sync                                       # dependências do backend
 uv run alembic upgrade head                   # migrações
 uv run fastapi dev app/main.py --port 8001    # backend
-uv run pytest                                 # testes do backend
+uv run pytest                                 # testes do backend (SQLite)
+```
+
+**Antes de qualquer deploy, rode os testes contra Postgres também** — produção
+é Postgres, e nem todo SQL vale nos dois:
+
+```bash
+docker run -d --name pg-teste -p 5433:5432 \
+  -e POSTGRES_PASSWORD=teste -e POSTGRES_USER=teste -e POSTGRES_DB=teste \
+  postgres:16-alpine
+
+cd backend
+TEST_DATABASE_URL=postgresql+asyncpg://teste:teste@localhost:5433/teste uv run pytest
 ```
 
 Antes de dizer que acabou: `npm test`, `uv run pytest` e `npx tsc --noEmit`.

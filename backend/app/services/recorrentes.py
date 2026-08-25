@@ -53,8 +53,14 @@ def datas_devidas(regra: RecurringRule, hoje: date) -> list[date]:
     # De onde continuar: do dia seguinte ao último gerado, ou do início da regra.
     piso = regra.last_applied_on
     cursor = _dia_do_mes(regra.start_on.year, regra.start_on.month, regra.day_of_month)
-    if cursor < regra.start_on:
-        # O dia deste mês já passou quando a regra foi criada: começa no próximo.
+    if cursor <= regra.start_on:
+        # O dia deste mês já passou (ou é hoje) quando a regra começa: a
+        # primeira ocorrência é a do mês que vem.
+        #
+        # O `<=` importa: cadastrar "todo dia 5" NO dia 5 não pode lançar na
+        # hora. Quem faz isso normalmente acabou de receber e está registrando
+        # dali pra frente — e um lançamento que aparece sozinho no mesmo
+        # segundo vira duplicata com o que a pessoa já anotou à mão.
         cursor = _dia_do_mes(*_mes_seguinte(regra.start_on.year, regra.start_on.month), regra.day_of_month)
 
     datas: list[date] = []

@@ -8,7 +8,7 @@ contas). O que estes testes protegem, acima de tudo, é que ler duas vezes não
 cria duas vezes.
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -109,6 +109,17 @@ async def _conta(client, auth) -> int:
     return r.json()["id"]
 
 
+def _hoje_utc() -> date:
+    """A mesma data que o servidor usa.
+
+    `date.today()` é local; o serviço trabalha em UTC. Entre 21h e meia-noite
+    aqui (GMT-3) os dois discordam, e um teste que mistura os dois passa ou
+    falha conforme a hora em que roda — foi assim que este arquivo escondeu um
+    bug de verdade por um dia.
+    """
+    return datetime.now(timezone.utc).date()
+
+
 async def _quantas_transacoes(client, auth) -> int:
     r = await client.get("/transactions?limit=500", headers=auth)
     return len(r.json())
@@ -126,7 +137,7 @@ async def test_regra_de_hoje_nao_lanca_retroativo(client, auth):
             "kind": "income",
             "amount_cents": 30_000,
             "description": "Mesada",
-            "day_of_month": date.today().day,
+            "day_of_month": _hoje_utc().day,
         },
     )
 
@@ -138,7 +149,7 @@ async def test_regra_de_hoje_nao_lanca_retroativo(client, auth):
 @pytest.mark.asyncio
 async def test_regra_que_comeca_no_passado_lanca_o_atrasado(client, auth):
     conta = await _conta(client, auth)
-    dois_meses_atras = date.today() - timedelta(days=62)
+    dois_meses_atras = _hoje_utc() - timedelta(days=62)
 
     await client.post(
         "/recurring",
@@ -171,7 +182,7 @@ async def test_ler_varias_vezes_nao_duplica(client, auth):
             "kind": "income",
             "amount_cents": 30_000,
             "day_of_month": 1,
-            "start_on": (date.today() - timedelta(days=62)).isoformat(),
+            "start_on": (_hoje_utc() - timedelta(days=62)).isoformat(),
         },
     )
     depois_de_criar = await _quantas_transacoes(client, auth)
@@ -196,7 +207,7 @@ async def test_o_lancamento_gerado_entra_no_saldo(client, auth):
             "kind": "income",
             "amount_cents": 30_000,
             "day_of_month": 1,
-            "start_on": (date.today() - timedelta(days=40)).isoformat(),
+            "start_on": (_hoje_utc() - timedelta(days=40)).isoformat(),
         },
     )
 
@@ -216,7 +227,7 @@ async def test_desligar_para_de_gerar_e_nao_apaga_o_passado(client, auth):
                 "kind": "income",
                 "amount_cents": 30_000,
                 "day_of_month": 1,
-                "start_on": (date.today() - timedelta(days=62)).isoformat(),
+                "start_on": (_hoje_utc() - timedelta(days=62)).isoformat(),
             },
         )
     ).json()
@@ -243,7 +254,7 @@ async def test_apagar_a_regra_mantem_o_que_ela_ja_lancou(client, auth):
                 "kind": "income",
                 "amount_cents": 30_000,
                 "day_of_month": 1,
-                "start_on": (date.today() - timedelta(days=62)).isoformat(),
+                "start_on": (_hoje_utc() - timedelta(days=62)).isoformat(),
             },
         )
     ).json()
@@ -268,7 +279,7 @@ async def test_diz_quando_e_a_proxima(client, auth):
     ).json()
 
     assert criada["proxima_em"] is not None
-    assert date.fromisoformat(criada["proxima_em"]) > date.today()
+    assert date.fromisoformat(criada["proxima_em"]) > _hoje_utc()
 
 
 @pytest.mark.asyncio

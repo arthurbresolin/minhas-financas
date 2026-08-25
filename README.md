@@ -89,6 +89,11 @@ prontos. Falta só escolher onde hospedar: ver `backend/DEPLOY.md`.
 - **O endereço do backend é deduzido, não configurado** (acima).
 - **`npm test` roda a lógica pura de `src/lib` e `src/theme`** (vitest, sem
   jsdom). O que é visual continua sendo verificado abrindo o app.
+- **O backend testa em SQLite, mas roda em Postgres.** Nem todo SQL vale nos
+  dois: um `func.iif()` (que só o SQLite tem) passou por 172 testes verdes e
+  derrubou a Home com 500 no primeiro container de produção. A suíte inteira
+  sabe rodar contra Postgres via `TEST_DATABASE_URL` — ver `CLAUDE.md`. **Rode
+  assim antes de todo deploy e sempre que mexer numa consulta.**
 - **`Alert.alert` não faz nada no `--web`.** O react-native-web não implementa
   ele. As confirmações (pagar fatura, sair da conta, apagar meta ou repetição)
   só funcionam no celular — que é o alvo. Testar esses caminhos no navegador dá

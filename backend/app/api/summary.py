@@ -1,7 +1,7 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -17,6 +17,15 @@ router = APIRouter(prefix="/summary", tags=["summary"])
 
 # Os mesmos períodos das abas do app.
 PERIOD_DAYS = {"7d": 7, "30d": 30, "3m": 90, "6m": 180}
+
+
+def _para_data(valor: object) -> date:
+    """O dia agrupado, venha ele como texto (SQLite) ou como data (Postgres)."""
+    if isinstance(valor, datetime):
+        return valor.date()
+    if isinstance(valor, date):
+        return valor
+    return datetime.strptime(str(valor), "%Y-%m-%d").date()
 
 
 @router.get("", response_model=SummaryRead)
@@ -78,27 +87,35 @@ async def read_summary(
         for category_id, name, emoji, color, total in by_category_rows.all()
     ]
 
-    # func.date() agrupa por dia no SQLite sem precisar trazer tudo pra memória.
+    # Agrupar por dia no banco, sem trazer tudo pra memória.
+    #
+    # Duas escolhas aqui existem só por causa de portabilidade, e as duas já
+    # custaram um 500 em produção:
+    #
+    # - `case()` em vez de `func.iif()`. O `iif` é do SQLite; no Postgres a
+    #   função nem existe, e a Home inteira deixava de carregar.
+    # - `_para_data` no resultado. O `date()` do SQLite devolve texto
+    #   "AAAA-MM-DD" e o do Postgres devolve um `date`; o código que lia o
+    #   resultado só podia estar certo num dos dois. (`cast(..., Date)` parece
+    #   a saída elegante e não é: o SQLite não tem tipo data, o CAST cai em
+    #   afinidade numérica e o valor volta pior do que entrou.)
+    dia = func.date(Transaction.occurred_at)
     by_day_rows = await db.execute(
         select(
-            func.date(Transaction.occurred_at),
+            dia,
             func.coalesce(
-                func.sum(func.iif(Transaction.kind == "expense", Transaction.amount_cents, 0)), 0
+                func.sum(case((Transaction.kind == "expense", Transaction.amount_cents), else_=0)), 0
             ),
             func.coalesce(
-                func.sum(func.iif(Transaction.kind == "income", Transaction.amount_cents, 0)), 0
+                func.sum(case((Transaction.kind == "income", Transaction.amount_cents), else_=0)), 0
             ),
         )
         .where(*in_period)
-        .group_by(func.date(Transaction.occurred_at))
-        .order_by(func.date(Transaction.occurred_at))
+        .group_by(dia)
+        .order_by(dia)
     )
     by_day = [
-        DayTotal(
-            day=datetime.strptime(day, "%Y-%m-%d").date(),
-            expense_cents=expense,
-            income_cents=income,
-        )
+        DayTotal(day=_para_data(day), expense_cents=expense, income_cents=income)
         for day, expense, income in by_day_rows.all()
     ]
 
