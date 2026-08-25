@@ -42,20 +42,33 @@ describe('digitar um valor', () => {
 });
 
 describe('mostrar um valor', () => {
+  /**
+   * O `toLocaleString('pt-BR')` separa "R$" do número com **espaço fixo**
+   * (U+00A0), não com espaço comum. Escrever o literal com o caractere de
+   * verdade deixaria um teste que quebra quando alguém reescreve a linha e
+   * digita um espaço normal — e o motivo seria invisível na tela. Então a
+   * comparação normaliza, e quem quiser travar o caractere usa o teste logo
+   * abaixo, que diz isso na cara.
+   */
+  const semEspacoFixo = (s: string) => s.replace(/\u00A0/g, ' ');
+
+  it('separa o símbolo com espaço fixo, não com espaço comum', () => {
+    expect(formatMoney(1_234)).toContain('\u00A0');
+  });
+
   it('escreve em real, com vírgula', () => {
-    //   é o espaço fixo que o pt-BR usa depois do "R$".
-    expect(formatMoney(1_234)).toBe('R$ 12,34');
-    expect(formatMoney(0)).toBe('R$ 0,00');
+    expect(semEspacoFixo(formatMoney(1_234))).toBe('R$ 12,34');
+    expect(semEspacoFixo(formatMoney(0))).toBe('R$ 0,00');
   });
 
   it('põe o menos antes do símbolo, não depois', () => {
-    expect(formatMoney(-1_234)).toBe('-R$ 12,34');
+    expect(semEspacoFixo(formatMoney(-1_234))).toBe('-R$ 12,34');
   });
 
   it('mostra o sinal dos dois lados quando pedido', () => {
     // É o extrato: entrada e saída na mesma lista precisam se distinguir.
-    expect(formatMoney(1_234, { showSign: true })).toBe('+R$ 12,34');
-    expect(formatMoney(-1_234, { showSign: true })).toBe('-R$ 12,34');
+    expect(semEspacoFixo(formatMoney(1_234, { showSign: true }))).toBe('+R$ 12,34');
+    expect(semEspacoFixo(formatMoney(-1_234, { showSign: true }))).toBe('-R$ 12,34');
   });
 
   it('sobrevive à ida e volta pelo campo', () => {
